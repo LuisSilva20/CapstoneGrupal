@@ -83,9 +83,10 @@ export class PerfilPage {
         const cursoId = Number(key.split('_')[2]);
         const cursoInfo = cursosData.find(c => c.id === cursoId);
 
-        const total = lessons.length || 1;
+        // Calcular progreso individual del curso
+        const totalLecciones = lessons.length;
         const completadas = lessons.filter(l => l.completed).length;
-        const progreso = Math.round((completadas / total) * 100);
+        const progreso = totalLecciones > 0 ? Math.round((completadas / totalLecciones) * 100) : 0;
 
         cursosTemp.push({
           id: cursoId,
@@ -114,7 +115,10 @@ export class PerfilPage {
 
     this.intentos.forEach(intento => {
       intento.fechaFormateada = this.formatearFecha(intento.fecha);
-      const correctas = intento.respuestas.filter(r => r.seleccion === r.correcta).length;
+      let correctas = 0;
+      intento.respuestas.forEach(r => {
+        if (r.seleccion === r.correcta) correctas++;
+      });
       intento.puntaje = (correctas / intento.respuestas.length) * 100;
     });
 
@@ -138,9 +142,10 @@ export class PerfilPage {
     ultimosTres.forEach(intento => {
       intento.respuestas.forEach(r => {
         const treeName = r.treeId?.trim() || 'Sin Categoría';
-        if (!arbolMap[treeName]) return;
-        if (r.seleccion === r.correcta) arbolMap[treeName].totalAciertos++;
-        else arbolMap[treeName].totalErrores++;
+        const arbol = arbolMap[treeName];
+        if (!arbol) return;
+        if (r.seleccion === r.correcta) arbol.totalAciertos++;
+        else arbol.totalErrores++;
       });
     });
 
@@ -157,10 +162,14 @@ export class PerfilPage {
 
   calcularProgresoGeneral() {
     if (!this.usuario) return;
-    const totalCursos = this.cursos.length;
+    const totalCursos = cursosData.length;
     if (totalCursos === 0) { this.usuario.progreso = 0; return; }
+    let sumaProgresos = 0;
 
-    const sumaProgresos = this.cursos.reduce((acc, c) => acc + c.progreso, 0);
+    this.cursos.forEach(curso => {
+      sumaProgresos += curso.progreso;
+    });
+
     this.usuario.progreso = Math.round(sumaProgresos / totalCursos);
   }
 
