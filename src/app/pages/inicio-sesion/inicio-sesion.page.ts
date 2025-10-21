@@ -1,8 +1,25 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { IonContent, IonHeader, IonTitle, IonToolbar, IonButtons, IonBackButton, IonCard, IonCardHeader, IonCardTitle,IonCardContent,
-IonItem, IonLabel, IonButton, IonInput, IonList } from '@ionic/angular/standalone';
+import {
+  IonContent,
+  IonHeader,
+  IonTitle,
+  IonToolbar,
+  IonButtons,
+  IonBackButton,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardContent,
+  IonItem,
+  IonLabel,
+  IonButton,
+  IonInput,
+  IonList,
+  IonAvatar,
+  IonIcon
+} from '@ionic/angular/standalone';
 import { Api } from 'src/app/servicios/api';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
@@ -14,6 +31,7 @@ import { User } from 'src/app/interfaces/interfaces';
   templateUrl: './inicio-sesion.page.html',
   styleUrls: ['./inicio-sesion.page.scss'],
   imports: [
+    IonIcon, IonAvatar,
     CommonModule,
     ReactiveFormsModule,
     IonContent,
@@ -30,7 +48,7 @@ import { User } from 'src/app/interfaces/interfaces';
     IonLabel,
     IonButton,
     IonInput,
-    IonList
+    IonList,
   ],
 })
 export class InicioSesionPage {
@@ -44,8 +62,19 @@ export class InicioSesionPage {
     private alertCtrl: AlertController
   ) {
     this.inicioSesionForm = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(16)]],
-      password: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(16)]],
+      username: ['', [Validators.required]],
+      password: ['', [Validators.required, Validators.minLength(4)]],
+    });
+  }
+
+  ionViewWillEnter() {
+    this.limpiarFormulario();
+  }
+
+  limpiarFormulario() {
+    this.inicioSesionForm.reset({
+      username: '',
+      password: '',
     });
   }
 
@@ -55,10 +84,11 @@ export class InicioSesionPage {
       return;
     }
 
-    const { username, password } = this.inicioSesionForm.value;
+    const identifier = this.inicioSesionForm.value.username.trim();
+    const password = this.inicioSesionForm.value.password;
 
     try {
-      const resp: User[] = (await this.api.GetUserById(username).toPromise()) ?? [];
+      const resp: User[] = (await this.api.GetUserByUsernameOrEmail(identifier).toPromise()) ?? [];
 
       if (!resp || resp.length === 0) {
         this.showAlert('Usuario no existe', 'Debe registrarse primero.');
@@ -77,20 +107,25 @@ export class InicioSesionPage {
         return;
       }
 
+      // Guardar datos del usuario en sessionStorage para el perfil
       sessionStorage.setItem('username', usuario.username);
+      sessionStorage.setItem('email', usuario.email);
+      sessionStorage.setItem('nombre', usuario.nombre);
+      sessionStorage.setItem('apellidos', usuario.apellidos);
       sessionStorage.setItem('ingresado', 'true');
-      (usuario as any).idCurso && sessionStorage.setItem('userCursoId', (usuario as any).idCurso.toString());
+      if ((usuario as any).idCurso) {
+        sessionStorage.setItem('userCursoId', (usuario as any).idCurso.toString());
+      }
 
       const toast = await this.toastCtrl.create({
         message: 'Sesión iniciada correctamente!',
         duration: 2000,
       });
-      toast.present();
+      await toast.present();
 
       this.router.navigateByUrl('/inicio');
-
     } catch (error) {
-      console.error(error);
+      console.error('Error en iniciarSesion():', error);
       this.showAlert('Error', 'Ocurrió un error al intentar iniciar sesión.');
     }
   }

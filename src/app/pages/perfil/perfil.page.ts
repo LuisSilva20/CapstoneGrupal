@@ -1,31 +1,32 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  IonContent, IonHeader, IonToolbar, IonTitle, IonCard,
-  IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
-  IonList, IonItem, IonLabel, IonProgressBar, IonButton, IonMenuButton,
-  IonButtons, IonAvatar, IonIcon
+  IonContent, IonHeader, IonToolbar, IonTitle,
+  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+  IonList, IonItem, IonLabel, IonProgressBar, IonButton, IonAvatar,
+  IonMenuButton, IonButtons, IonIcon
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { MenuController } from '@ionic/angular';
 import { cursosData } from 'src/app/data/cursos-data';
-import { Usuario, CursoGuardado, IntentoExamen, ArbolPerfil } from 'src/app/interfaces/interfaces';
+import { User, CursoGuardado, IntentoExamen, ArbolPerfil } from 'src/app/interfaces/interfaces';
 
 @Component({
   selector: 'app-perfil',
-  standalone: true,
   templateUrl: './perfil.page.html',
   styleUrls: ['./perfil.page.scss'],
+  standalone: true,
   imports: [
-    IonIcon, CommonModule, IonAvatar,
+    CommonModule,
     IonContent, IonHeader, IonToolbar, IonTitle,
     IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
-    IonList, IonItem, IonLabel, IonProgressBar, IonButton, IonMenuButton, IonButtons
+    IonList, IonItem, IonLabel, IonProgressBar, IonButton, IonAvatar,
+    IonMenuButton, IonButtons, IonIcon
   ]
 })
 export class PerfilPage {
-  usuario: Usuario | null = null;
-  cursos: CursoGuardado[] = [];
+  usuario: User | null = null;
+  cursos: (CursoGuardado & { progreso: number })[] = [];
   intentos: IntentoExamen[] = [];
   arboles: ArbolPerfil[] = [];
   fortalezas: ArbolPerfil[] = [];
@@ -55,40 +56,49 @@ export class PerfilPage {
 
   cargarUsuario() {
     const username = sessionStorage.getItem('username');
+    const email = sessionStorage.getItem('email');
+    const nombre = sessionStorage.getItem('nombre');
+    const apellidos = sessionStorage.getItem('apellidos');
+
     if (!username) return;
+
     this.usuario = {
       id: 1,
       username,
-      role: 'Estudiante',
-      isactive: true,
-      progreso: 0
+      email: email || '',
+      nombre: nombre || '',
+      apellidos: apellidos || '',
+      password: '',
+      isactive: true
     };
   }
 
   cargarCursosGuardados() {
     const username = sessionStorage.getItem('username') || 'anon';
-    const cursosTemp: CursoGuardado[] = [];
+    const cursosTemp: (CursoGuardado & { progreso: number })[] = [];
 
     Object.keys(localStorage).forEach(key => {
       if (key.startsWith(`curso_${username}_`)) {
         const lessons = JSON.parse(localStorage.getItem(key) || '[]') as any[];
         const cursoId = Number(key.split('_')[2]);
-        const total = lessons.length;
-        const completadas = lessons.filter(l => l.completed).length;
-
         const cursoInfo = cursosData.find(c => c.id === cursoId);
+
+        const total = lessons.length || 1;
+        const completadas = lessons.filter(l => l.completed).length;
+        const progreso = Math.round((completadas / total) * 100);
 
         cursosTemp.push({
           id: cursoId,
           title: cursoInfo?.titulo || `Curso ${cursoId}`,
+          arbol: cursoInfo?.arbol || 'Sin Árbol',
           lessons: lessons.map(l => ({
             titulo: l.titulo,
             completed: l.completed,
             fecha: l.fecha
           })),
-          progreso: total > 0 ? (completadas / total) * 100 : 0,
           mostrarDetalle: false,
-          fecha: lessons.length > 0 ? lessons[0].fecha || new Date().toISOString() : new Date().toISOString()
+          fecha: lessons.length > 0 ? lessons[0].fecha || new Date().toISOString() : new Date().toISOString(),
+          progreso
         });
       }
     });
@@ -104,10 +114,7 @@ export class PerfilPage {
 
     this.intentos.forEach(intento => {
       intento.fechaFormateada = this.formatearFecha(intento.fecha);
-      let correctas = 0;
-      intento.respuestas.forEach(r => {
-        if (r.seleccion === r.correcta) correctas++;
-      });
+      const correctas = intento.respuestas.filter(r => r.seleccion === r.correcta).length;
       intento.puntaje = (correctas / intento.respuestas.length) * 100;
     });
 
@@ -123,26 +130,17 @@ export class PerfilPage {
 
   calcularEstadisticasArboles() {
     const arbolMap: { [key: string]: ArbolPerfil } = {};
-
     this.todosLosArboles.forEach(nombre => {
-      arbolMap[nombre] = {
-        nombre,
-        totalAciertos: 0,
-        totalErrores: 0,
-        porcentajeAciertos: 0
-      };
+      arbolMap[nombre] = { nombre, totalAciertos: 0, totalErrores: 0, porcentajeAciertos: 0 };
     });
 
     const ultimosTres = this.intentos.slice(0, 3);
-
     ultimosTres.forEach(intento => {
       intento.respuestas.forEach(r => {
         const treeName = r.treeId?.trim() || 'Sin Categoría';
-        const arbol = arbolMap[treeName];
-        if (!arbol) return;
-
-        if (r.seleccion === r.correcta) arbol.totalAciertos++;
-        else arbol.totalErrores++;
+        if (!arbolMap[treeName]) return;
+        if (r.seleccion === r.correcta) arbolMap[treeName].totalAciertos++;
+        else arbolMap[treeName].totalErrores++;
       });
     });
 
@@ -159,39 +157,15 @@ export class PerfilPage {
 
   calcularProgresoGeneral() {
     if (!this.usuario) return;
+    const totalCursos = this.cursos.length;
+    if (totalCursos === 0) { this.usuario.progreso = 0; return; }
 
-    const totalCursos = cursosData.length;
-    if (totalCursos === 0) {
-      this.usuario.progreso = 0;
-      return;
-    }
-
-    let sumaProgresos = 0;
-    const username = sessionStorage.getItem('username') || 'anon';
-
-    cursosData.forEach(curso => {
-      const key = `curso_${username}_${curso.id}`;
-      const data = localStorage.getItem(key);
-
-      if (data) {
-        const lessons = JSON.parse(data);
-        const total = lessons.length;
-        const completadas = lessons.filter((l: any) => l.completed).length;
-        const progresoCurso = total > 0 ? (completadas / total) * 100 : 0;
-        sumaProgresos += progresoCurso;
-      }
-    });
-
+    const sumaProgresos = this.cursos.reduce((acc, c) => acc + c.progreso, 0);
     this.usuario.progreso = Math.round(sumaProgresos / totalCursos);
   }
 
-  toggleDetalleCurso(curso: CursoGuardado) {
-    curso.mostrarDetalle = !curso.mostrarDetalle;
-  }
-
-  toggleDetalleExamen(intento: IntentoExamen) {
-    intento.mostrarDetalle = !intento.mostrarDetalle;
-  }
+  toggleDetalleCurso(curso: CursoGuardado) { curso.mostrarDetalle = !curso.mostrarDetalle; }
+  toggleDetalleExamen(intento: IntentoExamen) { intento.mostrarDetalle = !intento.mostrarDetalle; }
 
   eliminarExamen(index: number) {
     const username = sessionStorage.getItem('username') || 'anon';
@@ -207,10 +181,7 @@ export class PerfilPage {
     this.calcularEstadisticasArboles();
   }
 
-  toggleMenu() {
-    this.menuCtrl.toggle();
-  }
-
+  toggleMenu() { this.menuCtrl.toggle(); }
   irArbol(nombreArbol: string) {
     sessionStorage.setItem('selectedTree', nombreArbol);
     this.router.navigateByUrl('/tree-detail');

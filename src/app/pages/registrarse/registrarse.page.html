@@ -44,6 +44,17 @@
               </ion-text>
 
               <ion-item>
+                <ion-label position="floating">Correo electrónico</ion-label>
+                <ion-input type="email" formControlName="email"></ion-input>
+              </ion-item>
+              <ion-text color="danger" *ngIf="f['email'].touched && f['email'].invalid">
+                <small *ngIf="f['email'].errors?.['required']">El correo es obligatorio.</small>
+                <small *ngIf="f['email'].errors?.['email']">Formato de correo no válido.</small>
+                <small *ngIf="f['email'].errors?.['maxlength']">Máximo 50 caracteres.</small>
+              </ion-text>
+
+
+              <ion-item>
                 <ion-label position="floating">Usuario</ion-label>
                 <ion-input type="text" formControlName="username"></ion-input>
               </ion-item>

@@ -1,6 +1,8 @@
+// Usuario
 export interface User {
   id?: number;
   username: string;
+  email: string;                // nuevo campo
   password: string;
   confirmPassword?: string;
   nombre: string;
@@ -10,24 +12,17 @@ export interface User {
   cursosCompletados?: number[];
 }
 
-export interface Usuario {
-  id: number;
-  username: string;
-  role: string;
-  isactive: boolean;
-  progreso?: number; 
-}
-
-
+// Cursos guardados por usuario
 export interface CursoGuardado {
   id: number;
   title: string;
+  arbol?: string;               // <-- agregado para mostrar árbol del curso
   lessons: { titulo: string; completed: boolean; fecha?: string }[];
-  progreso: number;
   mostrarDetalle?: boolean;
   fecha?: string;
 }
 
+// Respuestas dentro del perfil
 export interface RespuestaPerfil {
   preguntaId: number;
   treeId: string;
@@ -35,8 +30,10 @@ export interface RespuestaPerfil {
   opciones: string[];
   correcta: number;
   seleccion: number;
+  explicacion?: string;
 }
 
+// Intentos de examen
 export interface IntentoExamen {
   fecha: string; 
   fechaFormateada?: string; 
@@ -45,21 +42,12 @@ export interface IntentoExamen {
   mostrarDetalle?: boolean;
 }
 
+// Estadísticas de árboles de conocimiento
 export interface ArbolPerfil {
   nombre: string;
   totalAciertos: number;
   totalErrores: number;
   porcentajeAciertos: number;
-}
-
-export interface PreguntaExamen {
-  id: number;
-  treeId: string;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explicacion?: string;
-  userSeleccion?: number;
 }
 
 export interface ArbolEstadistica {
@@ -71,12 +59,33 @@ export interface ArbolEstadistica {
   porcentajeAciertos: number;
 }
 
+// Preguntas de examen
+export interface PreguntaExamen {
+  id: number;
+  treeId: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explicacion?: string;
+  userSeleccion?: number;
+}
+
+export interface PreguntaExamenLocal { 
+  texto: string;
+  opciones: string[];
+  correcta: number;
+  explicacion: string;
+  treeId?: string;
+}
+
+// Cursos y lecciones
 export interface Curso {
   id: number;
   titulo: string;
   descripcion: string;
   duracion: string;
   lessons?: Leccion[];
+  arbol?: string;
 }
 
 export interface Leccion {
@@ -88,6 +97,7 @@ export interface Leccion {
   material?: MaterialItem[];
 }
 
+// Material de lecciones
 export interface MaterialItemTexto {
   tipo: 'texto';
   valor: string;
@@ -108,6 +118,7 @@ export type MaterialItem =
   | MaterialItemImagen
   | MaterialItemLista;
 
+// Preguntas generales
 export interface PreguntaJSON {
   id: number;
   treeId: number;
@@ -126,6 +137,7 @@ export interface Pregunta {
   treeId?: string;
 }
 
+// Skills y árboles de conocimiento
 export interface Skill {
   name: string;
   level: number;
@@ -150,6 +162,7 @@ export interface KnowledgeTree {
   icon?: string;
 }
 
+// Componentes y fuentes
 export interface Componente {
   name: string;
   icon: string;
@@ -162,22 +175,3 @@ export interface Fuente {
   link: string;
   botonTexto: string;
 }
-
-export interface PreguntaExamenLocal { 
-  texto: string;
-  opciones: string[];
-  correcta: number;
-  explicacion: string;
-  treeId?: string;
-}
-
-export interface RespuestaPerfil {
-  preguntaId: number;      
-  treeId: string;           
-  texto: string;
-  opciones: string[];
-  correcta: number;
-  seleccion: number;
-  explicacion?: string;       
-}
-

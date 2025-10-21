@@ -76,6 +76,11 @@ export class RegistrarsePage {
         Validators.maxLength(25),
         Validators.pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/),
       ]),
+      email: new FormControl('', [          // 👈 nuevo campo
+        Validators.required,
+        Validators.email,
+        Validators.maxLength(50),
+      ]),
       username: new FormControl('', [
         Validators.required,
         Validators.minLength(8),
@@ -90,6 +95,7 @@ export class RegistrarsePage {
       ]),
       confirmPassword: new FormControl('', [Validators.required]),
     });
+
   }
 
   async Registrarse() {
@@ -109,6 +115,7 @@ export class RegistrarsePage {
       nombre: formValue.nombre.trim(),
       apellidos: formValue.apellidos.trim(),
       username: formValue.username.trim(),
+      email: formValue.email.trim(),
       password: formValue.password,
       confirmPassword: formValue.confirmPassword,
       isactive: true,

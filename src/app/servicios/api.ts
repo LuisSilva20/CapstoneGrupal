@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, map, switchMap, throwError } from 'rxjs';
+import { Observable, forkJoin, map, switchMap, throwError, of } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { User, Curso, Leccion } from '../interfaces/interfaces';
 
@@ -10,20 +10,32 @@ import { User, Curso, Leccion } from '../interfaces/interfaces';
 export class Api {
   constructor(private http: HttpClient) {}
 
+  // ======================================================
   // ==== USUARIOS ====
+  // ======================================================
 
   listarUsuarios(): Observable<User[]> {
     return this.http.get<User[]>(`${environment.apiUrl}/usuarios`);
   }
 
+  /**
+   * Crear un nuevo usuario con validación de username y email únicos.
+   */
   CrearUsuario(newUsuario: User): Observable<User> {
     return this.listarUsuarios().pipe(
       switchMap((usuarios: User[]) => {
-        const existe = usuarios.some(
+        const existeUsername = usuarios.some(
           (u) => u.username.toLowerCase() === newUsuario.username.toLowerCase()
         );
-        if (existe) {
+        const existeEmail = usuarios.some(
+          (u) => u.email.toLowerCase() === newUsuario.email.toLowerCase()
+        );
+
+        if (existeUsername) {
           return throwError(() => new Error('El nombre de usuario ya existe'));
+        }
+        if (existeEmail) {
+          return throwError(() => new Error('El correo electrónico ya está registrado'));
         }
 
         const maxId =
@@ -47,19 +59,54 @@ export class Api {
     );
   }
 
+  /**
+   * Obtener todos los usuarios
+   */
   GetAllUsers(): Observable<User[]> {
     return this.http.get<User[]>(`${environment.apiUrl}/usuarios`);
   }
 
-  GetUserById(username: string): Observable<User[]> {
+  /**
+   * Obtener usuario por username
+   */
+  GetUserByUsername(username: string): Observable<User[]> {
     return this.http.get<User[]>(`${environment.apiUrl}/usuarios?username=${username}`);
   }
 
+  /**
+   * Nuevo método: Obtener usuario por username o email (para login flexible)
+   */
+/**
+ * Obtener usuario por username o email (case-insensitive, filtrado client-side para evitar problemas de backend)
+ */
+  GetUserByUsernameOrEmail(valor: string) : Observable<User[]> {
+    const q = (valor || '').trim().toLowerCase();
+    if (!q) {
+      return of([]);
+    }
+
+    return this.listarUsuarios().pipe(
+      map((usuarios: User[]) => {
+        return usuarios.filter(u => {
+          const uName = (u.username || '').toString().trim().toLowerCase();
+          const uEmail = (u as any).email ? (u as any).email.toString().trim().toLowerCase() : '';
+          return uName === q || uEmail === q;
+        });
+      })
+    );
+  }
+
+
+  /**
+   * Verifica si hay sesión activa
+   */
   IsLogged(): boolean {
     return sessionStorage.getItem('username') != null;
   }
 
+  // ======================================================
   // ==== CURSOS Y LECCIONES ====
+  // ======================================================
 
   GetAllCursos(): Observable<Curso[]> {
     return this.http.get<Curso[]>(`${environment.apiUrl}/cursos`);
@@ -81,6 +128,9 @@ export class Api {
     return this.http.post<Leccion>(`${environment.apiUrl}/lecciones`, newLeccion);
   }
 
+  // ======================================================
+  // ==== PREGUNTAS Y RESULTADOS ====
+  // ======================================================
 
   GetPreguntas(): Observable<any[]> {
     return this.http.get<any[]>(`${environment.apiUrl}/preguntas`);

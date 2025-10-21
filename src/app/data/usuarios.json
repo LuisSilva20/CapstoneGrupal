@@ -1,81 +1,30 @@
 {
   "usuarios": [
     {
-      "id": "1",
-      "nombre": "Ricardo",
-      "apellidos": "Uribe",
-      "username": "Ricardo21",
-      "password": "Rurive21",
+      "id": 1,
+      "username": "admin",
+      "email": "admin@mail.com",
+      "password": "12345678",
+      "nombre": "Administrador",
+      "apellidos": "Principal",
       "isactive": true
     },
     {
-      "id": "2",
-      "nombre": "Viviana",
-      "apellidos": "Alvarez",
-      "username": "Viviana12",
-      "password": "Vivianaprofe",
-      "confirmPassword": "Vivianaprofe",
+      "id": 2,
+      "nombre": "Luis",
+      "apellidos": "Silva",
+      "username": "NaxorMC23",
+      "email": "l.silva2@duocuc.cl",
+      "password": "qwer1234",
+      "confirmPassword": "qwer1234",
       "isactive": true
     },
     {
-      "nombre": "juan",
-      "apellidos": "mendez",
-      "username": "yisus homosexual",
-      "password": "yisus1234",
-      "confirmPassword": "yisus1234",
-      "isactive": true,
-      "id": "3"
-    },
-    {
-      "id": "5",
-      "nombre": "as",
-      "apellidos": "as",
-      "username": "asdqwe12",
-      "password": "asdqwe12",
-      "confirmPassword": "asdqwe12",
-      "isactive": true
-    },
-    {
-      "id": "6",
-      "nombre": "Fabrizzio",
-      "apellidos": "Alvarez",
-      "username": "LilKai23",
-      "password": "lilkai23",
-      "confirmPassword": "lilkai23",
-      "isactive": true
-    },
-    {
-      "id": "7",
-      "nombre": "Natalia",
-      "apellidos": "Melgarejo",
-      "username": "nato1234",
-      "password": "nato1234",
-      "confirmPassword": "nato1234",
-      "isactive": true
-    },
-    {
-      "id": "8",
-      "nombre": "Belen",
-      "apellidos": "Rojas",
-      "username": "belrojas12",
-      "password": "asdfqwer12",
-      "confirmPassword": "asdfqwer12",
-      "isactive": true
-    },
-    {
-      "id": "9",
-      "nombre": "Pablo",
-      "apellidos": "Saavedra",
-      "username": "Pavloconuve",
-      "password": "QWER1234",
-      "confirmPassword": "QWER1234",
-      "isactive": true
-    },
-    {
-      "id": 10,
-      "nombre": "Constanza",
-      "apellidos": "Alfaro",
-      "username": "PainterLaPintora",
+      "id": 3,
+      "nombre": "Luis",
+      "apellidos": "Silva",
+      "username": "NaxorMC24",
+      "email": "luis60573@gmail.com",
       "password": "qwer1234",
       "confirmPassword": "qwer1234",
       "isactive": true
