@@ -20,9 +20,10 @@ import {
   IonAvatar,
   IonIcon
 } from '@ionic/angular/standalone';
-import { Api } from 'src/app/servicios/api';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
+import { Api } from 'src/app/servicios/api';
+import { AuthService } from 'src/app/servicios/auth';
 import { User } from 'src/app/interfaces/interfaces';
 
 @Component({
@@ -31,9 +32,9 @@ import { User } from 'src/app/interfaces/interfaces';
   templateUrl: './inicio-sesion.page.html',
   styleUrls: ['./inicio-sesion.page.scss'],
   imports: [
-    IonIcon, IonAvatar,
     CommonModule,
     ReactiveFormsModule,
+    IonIcon, IonAvatar,
     IonContent,
     IonHeader,
     IonTitle,
@@ -57,6 +58,7 @@ export class InicioSesionPage {
   constructor(
     private fb: FormBuilder,
     private api: Api,
+    private auth: AuthService,
     private router: Router,
     private toastCtrl: ToastController,
     private alertCtrl: AlertController
@@ -84,18 +86,23 @@ export class InicioSesionPage {
       return;
     }
 
-    const identifier = this.inicioSesionForm.value.username.trim();
-    const password = this.inicioSesionForm.value.password;
+    const identifier = this.inicioSesionForm.value.username?.trim() ?? '';
+    const password = this.inicioSesionForm.value.password ?? '';
+
+    if (!identifier || !password) {
+      this.showAlert('Error', 'Usuario o contraseña vacíos.');
+      return;
+    }
 
     try {
-      const resp: User[] = (await this.api.GetUserByUsernameOrEmail(identifier).toPromise()) ?? [];
+      const resp: User[] = (await this.api.getUserByUsernameOrEmail(identifier).toPromise() as User[]) ?? [];
 
       if (!resp || resp.length === 0) {
         this.showAlert('Usuario no existe', 'Debe registrarse primero.');
         return;
       }
 
-      const usuario = resp[0];
+      const usuario: User = resp[0];
 
       if (!usuario.isactive) {
         this.showAlert('Usuario inactivo', 'Contacta al administrador.');
@@ -107,14 +114,15 @@ export class InicioSesionPage {
         return;
       }
 
-      // Guardar datos del usuario en sessionStorage para el perfil
-      sessionStorage.setItem('username', usuario.username);
-      sessionStorage.setItem('email', usuario.email);
-      sessionStorage.setItem('nombre', usuario.nombre);
-      sessionStorage.setItem('apellidos', usuario.apellidos);
+      // Guardar datos del usuario en sessionStorage
+      sessionStorage.setItem('username', usuario.username ?? '');
+      sessionStorage.setItem('email', usuario.email ?? '');
+      sessionStorage.setItem('nombre', usuario.nombre ?? '');
+      sessionStorage.setItem('apellidos', usuario.apellidos ?? '');
       sessionStorage.setItem('ingresado', 'true');
+
       if ((usuario as any).idCurso) {
-        sessionStorage.setItem('userCursoId', (usuario as any).idCurso.toString());
+        sessionStorage.setItem('userCursoId', String((usuario as any).idCurso));
       }
 
       const toast = await this.toastCtrl.create({
@@ -127,6 +135,32 @@ export class InicioSesionPage {
     } catch (error) {
       console.error('Error en iniciarSesion():', error);
       this.showAlert('Error', 'Ocurrió un error al intentar iniciar sesión.');
+    }
+  }
+
+  // 🔹 Nuevo método: login con Google
+  async loginGoogle() {
+    try {
+      const user = await this.auth.loginWithGoogle(); // devuelve objeto User de Firebase
+      if (!user) return;
+
+      // Guardar datos en sessionStorage
+      sessionStorage.setItem('username', user.displayName ?? '');
+      sessionStorage.setItem('email', user.email ?? '');
+      sessionStorage.setItem('nombre', user.displayName?.split(' ')[0] ?? '');
+      sessionStorage.setItem('apellidos', user.displayName?.split(' ').slice(1).join(' ') ?? '');
+      sessionStorage.setItem('ingresado', 'true');
+
+      const toast = await this.toastCtrl.create({
+        message: 'Sesión iniciada con Google correctamente!',
+        duration: 2000,
+      });
+      await toast.present();
+
+      this.router.navigateByUrl('/inicio');
+    } catch (err) {
+      console.error('Error loginGoogle:', err);
+      this.showAlert('Error', 'No se pudo iniciar sesión con Google.');
     }
   }
 

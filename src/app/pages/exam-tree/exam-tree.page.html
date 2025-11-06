@@ -9,6 +9,7 @@
 
 <ion-content class="ion-padding">
 
+  <!-- Reglas del examen -->
   <ion-card *ngIf="mostrarReglas">
     <ion-card-header>
       <ion-card-title>Reglas del examen de {{ treeName }}</ion-card-title>
@@ -24,8 +25,10 @@
     </ion-card-content>
   </ion-card>
 
+  <!-- Spinner mientras carga -->
   <ion-spinner *ngIf="cargando" name="crescent" class="ion-margin"></ion-spinner>
 
+  <!-- Examen -->
   <ng-container *ngIf="!mostrarReglas && !terminado && preguntas.length > 0 && !cargando">
     <div class="timer-container">
       <p>⏱ Tiempo restante: {{ getTiempo() }}</p>
@@ -38,13 +41,13 @@
       </ion-card-header>
 
       <ion-card-content>
-        <h2>{{ preguntas[preguntaActual].texto }}</h2>
+        <h2>{{ preguntas[preguntaActual].question }}</h2>
 
         <ion-list>
           <ion-radio-group
             [value]="respuestasUsuario[preguntas[preguntaActual].id]"
             (ionChange)="responder($event.detail.value)">
-            <ion-item *ngFor="let opcion of preguntas[preguntaActual].opciones; let i = index">
+            <ion-item *ngFor="let opcion of preguntas[preguntaActual].options; let i = index">
               <ion-label>{{ opcion }}</ion-label>
               <ion-radio slot="start" [value]="i"></ion-radio>
             </ion-item>
@@ -58,6 +61,7 @@
     </ion-card>
   </ng-container>
 
+  <!-- Resultados -->
   <ng-container *ngIf="terminado && !cargando">
     <ion-card>
       <ion-card-header>
@@ -74,12 +78,12 @@
         <ion-list>
           <ion-item *ngFor="let p of preguntas">
             <ion-label>
-              <h3>{{ p.texto }}</h3>
+              <h3>{{ p.question }}</h3>
               <ion-list>
-                <ion-item *ngFor="let opcion of p.opciones; let i = index"
+                <ion-item *ngFor="let opcion of p.options; let i = index"
                           [ngClass]="{
-                            'correcta': i === p.correcta,
-                            'incorrecta': i === respuestasUsuario[p.id] && i !== p.correcta
+                            'correcta': i === p.correctAnswer,
+                            'incorrecta': i === respuestasUsuario[p.id] && i !== p.correctAnswer
                           }">
                   {{ opcion }}
                 </ion-item>

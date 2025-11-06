@@ -1,5 +1,6 @@
-// src/app/app.component.ts
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import {
   IonApp,
   IonMenu,
@@ -13,10 +14,7 @@ import {
   IonMenuToggle,
   IonLabel,
   IonRouterOutlet
-  
 } from '@ionic/angular/standalone';
-import { RouterModule, Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
 
 interface Componente {
   name: string;
@@ -27,10 +25,10 @@ interface Componente {
 
 @Component({
   selector: 'app-root',
-  templateUrl: './app.component.html',
   standalone: true,
+  templateUrl: './app.component.html',
   imports: [
-    IonRouterOutlet,
+    CommonModule,
     IonApp,
     IonMenu,
     IonHeader,
@@ -42,9 +40,8 @@ interface Componente {
     IonIcon,
     IonMenuToggle,
     IonLabel,
-    CommonModule,
-    RouterModule,
-  ],
+    IonRouterOutlet
+  ]
 })
 export class AppComponent {
   nombre: string | null = '';
@@ -53,7 +50,7 @@ export class AppComponent {
   componentes: Componente[] = [
     { name: 'Perfil', redirecTo: '/perfil', icon: 'person-outline' },
     { name: 'Inicio', redirecTo: '/inicio', icon: 'home-outline' },
-    { name: 'Cursos', icon: 'school-outline' }, // Se actualizará dinámicamente
+    { name: 'Cursos', icon: 'school-outline' },
     { name: 'Examen', redirecTo: '/examen', icon: 'reader-outline' },
     { name: 'Estadisticas', redirecTo: '/estadisticas', icon: 'stats-chart-outline' },
     { name: 'Cerrar Sesión', icon: 'log-out-outline', action: () => this.cerrarSesion() },
@@ -66,19 +63,13 @@ export class AppComponent {
     const cursoAsignado = sessionStorage.getItem('userCursoId');
     this.userCursoId = cursoAsignado ? Number(cursoAsignado) : 1;
 
-    // Asignar acción del menú "Cursos"
-    const cursoMenu = this.componentes.find((c) => c.name === 'Cursos');
-    if (cursoMenu) {
-      cursoMenu.action = () => this.router.navigateByUrl('/tree-detail'); // sin parámetro
-    }
+    const cursoMenu = this.componentes.find(c => c.name === 'Cursos');
+    if (cursoMenu) cursoMenu.action = () => this.router.navigateByUrl('/tree-detail');
   }
 
   navegar(componente: Componente) {
-    if (componente.redirecTo) {
-      this.router.navigateByUrl(componente.redirecTo);
-    } else if (componente.action) {
-      componente.action();
-    }
+    if (componente.redirecTo) this.router.navigateByUrl(componente.redirecTo);
+    else if (componente.action) componente.action();
   }
 
   cerrarSesion() {

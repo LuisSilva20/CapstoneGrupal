@@ -1,14 +1,31 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { IonicModule, MenuController } from '@ionic/angular';
+import { Router } from '@angular/router';
+import { Api } from 'src/app/servicios/api';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonCard,
   IonCardHeader, IonCardTitle, IonCardContent, IonList, IonItem,
-  IonLabel, IonProgressBar, IonButton, IonMenuButton, IonButtons,
-  IonCardSubtitle
+  IonLabel, IonProgressBar, IonButton, IonMenuButton, IonButtons, IonCardSubtitle
 } from '@ionic/angular/standalone';
-import { MenuController } from '@ionic/angular';
-import { Router } from '@angular/router';
-import { ArbolEstadistica } from 'src/app/interfaces/interfaces';
+import { KnowledgeTree, PreguntaExamen, IntentoExamen } from 'src/app/interfaces/interfaces';
+
+interface ArbolEstadistica {
+  nombre: string;
+  totalPreguntas: number;
+  totalAciertos: number;
+  totalErrores: number;
+  porcentajeAciertos: number;
+  preguntasIncorrectas: Array<{
+    id: string | number;
+    treeId: string | number;
+    question: string;
+    options: string[];
+    correctAnswer: number;
+    explicacion?: string;
+    userSeleccion: number;
+  }>;
+}
 
 @Component({
   selector: 'app-estadisticas',
@@ -16,7 +33,7 @@ import { ArbolEstadistica } from 'src/app/interfaces/interfaces';
   templateUrl: './estadisticas.page.html',
   styleUrls: ['./estadisticas.page.scss'],
   imports: [
-    CommonModule,
+    CommonModule, IonicModule,
     IonHeader, IonToolbar, IonTitle, IonContent,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonList, IonItem, IonLabel, IonProgressBar, IonButton,
@@ -24,24 +41,13 @@ import { ArbolEstadistica } from 'src/app/interfaces/interfaces';
   ]
 })
 export class EstadisticasPage implements OnInit {
-
   arboles: ArbolEstadistica[] = [];
-  filtroAReforzar: boolean = false;
-  preguntasInspeccionadas: { [key: number]: boolean } = {};
+  filtroAReforzar = false;
+  preguntasInspeccionadas: { [key: string]: boolean } = {};
+  allTrees: KnowledgeTree[] = [];
+  cargando = true;
 
-  todosLosArboles: string[] = [
-    'Siniestros de tránsito',
-    'Los principios de la conducción',
-    'Convivencia Vial',
-    'La persona en el tránsito',
-    'Las y los usuarios vulnerables',
-    'Normas de circulación',
-    'Conducción en circunstancias especiales',
-    'Conducción eficiente',
-    'Informaciones importantes'
-  ];
-
-  constructor(private router: Router, private menuCtrl: MenuController) {}
+  constructor(private router: Router, private menuCtrl: MenuController, private api: Api) {}
 
   ngOnInit() {
     this.cargarEstadisticas();
@@ -55,64 +61,86 @@ export class EstadisticasPage implements OnInit {
     this.filtroAReforzar = !this.filtroAReforzar;
   }
 
-  toggleInspeccionPregunta(pregId: number) {
+  toggleInspeccionPregunta(pregId: string | number) {
     this.preguntasInspeccionadas[pregId] = !this.preguntasInspeccionadas[pregId];
   }
 
-cargarEstadisticas() {
-  const username = sessionStorage.getItem('username') || 'anon';
-  const intentosStr = localStorage.getItem(`intentos_${username}`);
-  const intentos = intentosStr ? JSON.parse(intentosStr) : [];
+async cargarEstadisticas() {
+  try {
+    this.cargando = true;
 
-  if (!intentos || intentos.length === 0) return;
+    // 1️⃣ Traer árboles de conocimiento
+    this.allTrees = (await this.api.getArboles().toPromise()) ?? [];
 
-  const ultimo = intentos[0]; 
+    // 2️⃣ Traer todas las preguntas
+    const preguntas: PreguntaExamen[] = (await this.api.getPreguntas().toPromise()) ?? [];
 
-  const arbolMap: { [key: string]: ArbolEstadistica } = {};
+    // 3️⃣ Traer intentos del usuario
+    const username = sessionStorage.getItem('username') || 'anon';
+    const intentos: IntentoExamen[] = (await this.api.getIntentos(username).toPromise()) ?? [];
 
-  this.todosLosArboles.forEach(nombre => {
-    arbolMap[nombre] = {
-      nombre,
-      preguntasIncorrectas: [],
-      totalPreguntas: 0,
-      totalAciertos: 0,
-      totalErrores: 0,
-      porcentajeAciertos: 0
-    };
-  });
+    // 4️⃣ Inicializar mapa de estadísticas por árbol
+    const arbolMap: { [key: string]: ArbolEstadistica } = {};
+    this.allTrees.forEach(tree => {
+      arbolMap[tree.name] = {
+        nombre: tree.name,
+        totalPreguntas: 0,
+        totalAciertos: 0,
+        totalErrores: 0,
+        porcentajeAciertos: 0,
+        preguntasIncorrectas: []
+      };
+    });
 
-  ultimo.respuestas.forEach((r: any) => {
-    const treeName = r.treeId?.trim() || 'Sin Categoría';
-    const arbol = arbolMap[treeName];
-    if (!arbol) return;
+    // 5️⃣ Procesar respuestas del usuario a partir de intentos
+    intentos.forEach(intento => {
+      (intento.respuestas ?? []).forEach(resp => {
+        // resp: { preguntaId, seleccion }
+        const pregunta = preguntas.find(p => p.id === resp.preguntaId);
+        if (!pregunta) return;
 
-    arbol.totalPreguntas++;
+        const treeName = this.allTrees.find(t => t.id === pregunta.treeId)?.name ?? 'Sin Categoría';
+        const arbol = arbolMap[treeName];
+        if (!arbol) return;
 
-    if (r.seleccion === r.correcta) {
-      arbol.totalAciertos++;
-    } else {
-      arbol.totalErrores++;
-      arbol.preguntasIncorrectas.push({
-        id: r.id,
-        treeId: r.treeId,
-        question: r.texto,
-        options: r.opciones,
-        correctAnswer: r.correcta,
-        explicacion: r.explicacion,
-        userSeleccion: r.seleccion
+        arbol.totalPreguntas++;
+        if (pregunta.correctAnswer === resp.seleccion) {
+          arbol.totalAciertos++;
+        } else {
+          arbol.totalErrores++;
+          arbol.preguntasIncorrectas.push({
+            id: pregunta.id,
+            treeId: pregunta.treeId,
+            question: pregunta.question,
+            options: pregunta.options,
+            correctAnswer: pregunta.correctAnswer,
+            explicacion: pregunta.explicacion,
+            userSeleccion: resp.seleccion
+          });
+        }
       });
-    }
-  });
+    });
 
-  Object.values(arbolMap).forEach(arbol => {
-    arbol.porcentajeAciertos = arbol.totalPreguntas > 0
-      ? (arbol.totalAciertos / arbol.totalPreguntas) * 100
-      : 100;
-  });
+    // 6️⃣ Calcular porcentaje de aciertos
+    Object.values(arbolMap).forEach(a => {
+      a.porcentajeAciertos = a.totalPreguntas > 0
+        ? (a.totalAciertos / a.totalPreguntas) * 100
+        : 100;
+    });
 
-  this.arboles = this.todosLosArboles.map(nombre => arbolMap[nombre]);
+    this.arboles = Object.values(arbolMap);
+    this.cargando = false;
+  } catch (err) {
+    console.error('Error cargando estadísticas', err);
+    this.cargando = false;
+  }
 }
 
+
+  irArbol(nombreArbol: string) {
+    sessionStorage.setItem('selectedTree', nombreArbol);
+    this.router.navigateByUrl('/tree-detail');
+  }
 
   get filasArboles() {
     const filas = [];
@@ -120,10 +148,5 @@ cargarEstadisticas() {
       filas.push(this.arboles.slice(i, i + 3));
     }
     return filas;
-  }
-
-  irArbol(nombreArbol: string) {
-    sessionStorage.setItem('selectedTree', nombreArbol);
-    this.router.navigateByUrl('/tree-detail');
   }
 }

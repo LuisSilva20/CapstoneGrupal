@@ -1,146 +1,146 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable, forkJoin, map, switchMap, throwError, of } from 'rxjs';
-import { environment } from 'src/environments/environment';
-import { User, Curso, Leccion } from '../interfaces/interfaces';
+import { Injectable, Inject } from '@angular/core';
+import { Firestore, collection, collectionData, addDoc, doc, updateDoc } from '@angular/fire/firestore';
+import { from, Observable, map } from 'rxjs';
+import { User, IntentoExamen, PreguntaExamen, KnowledgeTree, Curso, Leccion } from '../interfaces/interfaces';
 
 @Injectable({
   providedIn: 'root',
 })
 export class Api {
-  constructor(private http: HttpClient) {}
+  private usuariosCollection = 'users';
+  private cursosCollection = 'cursos';
+  private leccionesCollection = 'lecciones';
+  private preguntasCollection = 'preguntas';
+  private resultadosCollection = 'resultados';
+  private arbolesCollection = 'arboles';
 
-  // ======================================================
-  // ==== USUARIOS ====
-  // ======================================================
+  constructor(@Inject(Firestore) private firestore: Firestore) {}
 
+  // ===========================
+  // ===== SESIÓN / LOGIN ======
+  // ===========================
+  isLogged(): boolean {
+    return !!sessionStorage.getItem('username'); // true si hay usuario en sesión
+  }
+
+  // ===========================
+  // ===== USUARIOS ===========
+  // ===========================
   listarUsuarios(): Observable<User[]> {
-    return this.http.get<User[]>(`${environment.apiUrl}/usuarios`);
+    const usuariosRef = collection(this.firestore, this.usuariosCollection);
+    return collectionData(usuariosRef, { idField: 'id' }) as Observable<User[]>;
   }
 
-  /**
-   * Crear un nuevo usuario con validación de username y email únicos.
-   */
-  CrearUsuario(newUsuario: User): Observable<User> {
-    return this.listarUsuarios().pipe(
-      switchMap((usuarios: User[]) => {
-        const existeUsername = usuarios.some(
-          (u) => u.username.toLowerCase() === newUsuario.username.toLowerCase()
-        );
-        const existeEmail = usuarios.some(
-          (u) => u.email.toLowerCase() === newUsuario.email.toLowerCase()
-        );
-
-        if (existeUsername) {
-          return throwError(() => new Error('El nombre de usuario ya existe'));
-        }
-        if (existeEmail) {
-          return throwError(() => new Error('El correo electrónico ya está registrado'));
-        }
-
-        const maxId =
-          usuarios.length > 0
-            ? Math.max(
-                ...usuarios.map((u) =>
-                  typeof u.id === 'string' ? parseInt(u.id) || 0 : (u.id as number)
-                )
-              )
-            : 0;
-        const nuevoId = maxId + 1;
-
-        const usuarioFinal: User = {
-          ...newUsuario,
-          id: nuevoId,
-          isactive: true,
-        };
-
-        return this.http.post<User>(`${environment.apiUrl}/usuarios`, usuarioFinal);
-      })
+  crearUsuario(newUsuario: Omit<User, 'id'>): Observable<User> {
+    const usuariosRef = collection(this.firestore, this.usuariosCollection);
+    return from(addDoc(usuariosRef, newUsuario)).pipe(
+      map(docRef => ({ id: docRef.id, ...newUsuario } as User))
     );
   }
 
-  /**
-   * Obtener todos los usuarios
-   */
-  GetAllUsers(): Observable<User[]> {
-    return this.http.get<User[]>(`${environment.apiUrl}/usuarios`);
+  getUserByUsername(username: string): Observable<User[]> {
+    return this.listarUsuarios().pipe(
+      map(users => users.filter(u => u.username?.toLowerCase() === username.toLowerCase()))
+    );
   }
 
-  /**
-   * Obtener usuario por username
-   */
-  GetUserByUsername(username: string): Observable<User[]> {
-    return this.http.get<User[]>(`${environment.apiUrl}/usuarios?username=${username}`);
-  }
-
-  /**
-   * Nuevo método: Obtener usuario por username o email (para login flexible)
-   */
-/**
- * Obtener usuario por username o email (case-insensitive, filtrado client-side para evitar problemas de backend)
- */
-  GetUserByUsernameOrEmail(valor: string) : Observable<User[]> {
+  getUserByUsernameOrEmail(valor: string): Observable<User[]> {
     const q = (valor || '').trim().toLowerCase();
-    if (!q) {
-      return of([]);
-    }
-
+    if (!q) return from([]);
     return this.listarUsuarios().pipe(
-      map((usuarios: User[]) => {
-        return usuarios.filter(u => {
-          const uName = (u.username || '').toString().trim().toLowerCase();
-          const uEmail = (u as any).email ? (u as any).email.toString().trim().toLowerCase() : '';
-          return uName === q || uEmail === q;
-        });
-      })
+      map(users => users.filter(
+        u => (u.username?.toLowerCase() === q) || (u.email.toLowerCase() === q)
+      ))
     );
   }
 
-
-  /**
-   * Verifica si hay sesión activa
-   */
-  IsLogged(): boolean {
-    return sessionStorage.getItem('username') != null;
+  actualizarUsuario(id: string, datos: Partial<User>): Observable<void> {
+    const userDoc = doc(this.firestore, `${this.usuariosCollection}/${id}`);
+    return from(updateDoc(userDoc, datos));
   }
 
-  // ======================================================
-  // ==== CURSOS Y LECCIONES ====
-  // ======================================================
-
-  GetAllCursos(): Observable<Curso[]> {
-    return this.http.get<Curso[]>(`${environment.apiUrl}/cursos`);
+  // ===========================
+  // ===== CURSOS ============
+  // ===========================
+  getAllCursos(): Observable<Curso[]> {
+    const cursosRef = collection(this.firestore, this.cursosCollection);
+    return collectionData(cursosRef, { idField: 'id' }) as Observable<Curso[]>;
   }
 
-  GetCursosByUsuario(username: string): Observable<Curso[]> {
-    return this.http.get<Curso[]>(`${environment.apiUrl}/cursos?usuario=${username}`);
+  crearCurso(newCurso: Omit<Curso, 'id'>): Observable<Curso> {
+    const cursosRef = collection(this.firestore, this.cursosCollection);
+    return from(addDoc(cursosRef, newCurso)).pipe(
+      map(docRef => ({ id: docRef.id, ...newCurso } as Curso))
+    );
   }
 
-  GetLeccionesByCurso(cursoId: number): Observable<Leccion[]> {
-    return this.http.get<Leccion[]>(`${environment.apiUrl}/lecciones?cursoId=${cursoId}`);
+  // ===========================
+  // ===== LECCIONES ==========
+  // ===========================
+  getLeccionesByCurso(cursoId: string | number): Observable<Leccion[]> {
+    const leccionesRef = collection(this.firestore, this.leccionesCollection);
+    return collectionData(leccionesRef, { idField: 'id' }).pipe(
+      map((lecciones: any[]) =>
+        lecciones
+          .map(l => ({ ...l } as Leccion))
+          .filter(l => l.cursoId.toString() === cursoId.toString())
+      )
+    );
   }
 
-  CrearCurso(newCurso: Curso): Observable<Curso> {
-    return this.http.post<Curso>(`${environment.apiUrl}/cursos`, newCurso);
+  crearLeccion(newLeccion: Omit<Leccion, 'id'>): Observable<Leccion> {
+    const leccionesRef = collection(this.firestore, this.leccionesCollection);
+    return from(addDoc(leccionesRef, newLeccion)).pipe(
+      map(docRef => ({ id: docRef.id, ...newLeccion } as Leccion))
+    );
   }
 
-  CrearLeccion(newLeccion: Leccion): Observable<Leccion> {
-    return this.http.post<Leccion>(`${environment.apiUrl}/lecciones`, newLeccion);
+  // ===========================
+  // ===== PREGUNTAS ==========
+  // ===========================
+  getPreguntas(treeId?: string | number): Observable<PreguntaExamen[]> {
+    const preguntasRef = collection(this.firestore, this.preguntasCollection);
+    return collectionData(preguntasRef, { idField: 'id' }).pipe(
+      map((pregs: any[]) =>
+        pregs
+          .map(p => ({ ...p } as PreguntaExamen))
+          .filter(p => treeId ? p.treeId?.toString() === treeId.toString() : true)
+      )
+    );
   }
 
-  // ======================================================
-  // ==== PREGUNTAS Y RESULTADOS ====
-  // ======================================================
-
-  GetPreguntas(): Observable<any[]> {
-    return this.http.get<any[]>(`${environment.apiUrl}/preguntas`);
+  // ===========================
+  // ===== RESULTADOS / INTENTOS
+  // ===========================
+  guardarIntento(usuarioId: string, respuestas: any[], score: number): Observable<IntentoExamen> {
+    const resultadosRef = collection(this.firestore, this.resultadosCollection);
+    const intento: IntentoExamen = {
+      usuarioId,
+      fecha: new Date().toISOString(),
+      respuestas,
+      puntaje: score,
+    };
+    return from(addDoc(resultadosRef, intento)).pipe(map(() => intento));
   }
 
-  GuardarResultado(username: string, puntaje: number): Observable<any> {
-    return this.http.post(`${environment.apiUrl}/resultados`, {
-      usuario: username,
-      puntaje,
-      fecha: new Date(),
-    });
+  getIntentos(usuarioId: string): Observable<IntentoExamen[]> {
+    const resultadosRef = collection(this.firestore, this.resultadosCollection);
+    return collectionData(resultadosRef, { idField: 'id' }).pipe(
+      map((res: any[]) =>
+        res
+          .map(r => ({ ...r } as IntentoExamen))
+          .filter(r => r.usuarioId === usuarioId)
+      )
+    );
+  }
+
+  // ===========================
+  // ===== ÁRBOLES ============
+  // ===========================
+  getArboles(): Observable<KnowledgeTree[]> {
+    const treesRef = collection(this.firestore, this.arbolesCollection);
+    return collectionData(treesRef, { idField: 'id' }).pipe(
+      map((trees: any[]) => trees.map(t => ({ ...t } as KnowledgeTree)))
+    );
   }
 }

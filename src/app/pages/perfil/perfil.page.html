@@ -38,10 +38,10 @@
     <ion-card-content>
       <div *ngFor="let curso of cursos" class="curso-card">
         <div class="curso-titulo">{{ curso.title }}</div>
-        <div class="curso-arbol"><strong>Árbol:</strong> {{ curso.arbol }}</div>
+        <div class="curso-arbol"><strong>Árbol:</strong> {{ curso.arbol ?? 'Sin categoría' }}</div>
         <div class="curso-progreso">
           <strong>Progreso:</strong> {{ curso.progreso }}%
-          <ion-progress-bar [value]="curso.progreso / 100"></ion-progress-bar>
+          <ion-progress-bar [value]="curso.progreso / 100" color="tertiary"></ion-progress-bar>
         </div>
       </div>
     </ion-card-content>
@@ -95,10 +95,10 @@
     <ion-card-content>
       <ion-card *ngFor="let intento of intentos; let i = index" class="intento-card">
         <ion-card-header>
-          <ion-card-title>{{ intento.fechaFormateada }}</ion-card-title>
+          <ion-card-title>{{ intento.fechaFormateada ?? '' }}</ion-card-title>
           <ion-card-subtitle>
-            Puntaje: {{ intento.puntaje | number:'1.0-0' }}%
-            <ion-progress-bar [value]="intento.puntaje / 100" color="success"></ion-progress-bar>
+            Puntaje: {{ intento.puntaje ?? 0 | number:'1.0-0' }}%
+            <ion-progress-bar [value]="(intento.puntaje ?? 0) / 100" color="success"></ion-progress-bar>
           </ion-card-subtitle>
         </ion-card-header>
 
@@ -116,8 +116,8 @@
                 <ion-label>
                   <p><strong>{{ r.texto }}</strong></p>
                   <p>
-                    <span class="incorrecta">Tu respuesta: {{ r.opciones[r.seleccion] || 'No respondida' }}</span><br>
-                    <span class="correcta">Respuesta correcta: {{ r.opciones[r.correcta] }}</span>
+                    <span class="incorrecta">Tu respuesta: {{ r.opciones[r.seleccion] ?? 'No respondida' }}</span><br>
+                    <span class="correcta">Respuesta correcta: {{ r.opciones[r.correcta] ?? 'N/A' }}</span>
                   </p>
                   <p *ngIf="r.explicacion"><em>{{ r.explicacion }}</em></p>
                 </ion-label>

@@ -17,61 +17,68 @@
     <ng-container *ngFor="let fila of filasArboles">
       <ng-container *ngFor="let arbol of fila">
         <div class="arbol-cell">
-          <div class="arbol-nombre">{{ arbol.nombre }}</div>
+          <div class="arbol-nombre">{{ arbol?.nombre ?? 'Sin nombre' }}</div>
           <div class="arbol-stats">
-            <span class="aciertos">{{ arbol.totalAciertos }}</span> / 
-            <span class="errores">{{ arbol.totalErrores }}</span>
+            <span class="aciertos">{{ arbol?.totalAciertos ?? 0 }}</span> / 
+            <span class="errores">{{ arbol?.totalErrores ?? 0 }}</span>
           </div>
         </div>
       </ng-container>
     </ng-container>
   </div>
 
-  <ion-card *ngFor="let arbol of arboles" [hidden]="filtroAReforzar && arbol.porcentajeAciertos >= 80" color="light">
+  <ion-card *ngFor="let arbol of arboles" [hidden]="filtroAReforzar && (arbol?.porcentajeAciertos ?? 100) >= 80" color="light">
     <ion-card-header>
-      <ion-card-title>{{ arbol.nombre }}</ion-card-title>
-      <ion-card-subtitle>Porcentaje de aciertos: {{ arbol.porcentajeAciertos | number:'1.0-0' }}%</ion-card-subtitle>
+      <ion-card-title>{{ arbol?.nombre ?? 'Sin nombre' }}</ion-card-title>
+      <ion-card-subtitle>
+        Porcentaje de aciertos: {{ arbol?.porcentajeAciertos ?? 0 | number:'1.0-0' }}%
+      </ion-card-subtitle>
     </ion-card-header>
 
     <ion-card-content>
-      <ion-progress-bar [value]="arbol.porcentajeAciertos / 100"
-                        [color]="arbol.porcentajeAciertos >= 80 ? 'success' : 'danger'"></ion-progress-bar>
+      <ion-progress-bar [value]="(arbol?.porcentajeAciertos ?? 0) / 100"
+                        [color]="(arbol?.porcentajeAciertos ?? 0) >= 80 ? 'success' : 'danger'">
+      </ion-progress-bar>
 
-      <div *ngIf="arbol.preguntasIncorrectas.length > 0" class="ion-margin-top">
+      <div *ngIf="(arbol?.preguntasIncorrectas?.length ?? 0) > 0" class="ion-margin-top">
         <h3>Preguntas a reforzar:</h3>
         <ion-list>
-          <ng-container *ngFor="let pregunta of arbol.preguntasIncorrectas">
+          <ng-container *ngFor="let pregunta of arbol?.preguntasIncorrectas ?? []">
             <ion-item>
               <ion-label>
-                <p><strong>Pregunta N°{{ pregunta.id }}:</strong> {{ pregunta.question }}</p>
+                <p><strong>Pregunta N°{{ pregunta?.id ?? '?' }}:</strong> {{ pregunta?.question ?? 'No disponible' }}</p>
               </ion-label>
-              <ion-button size="small" color="medium" (click)="toggleInspeccionPregunta(pregunta.id)">
-                {{ preguntasInspeccionadas[pregunta.id] ? 'Ocultar' : 'Examinar' }}
+              <ion-button size="small" color="medium" (click)="toggleInspeccionPregunta(pregunta?.id ?? 0)">
+                {{ preguntasInspeccionadas[pregunta?.id ?? 0] ? 'Ocultar' : 'Examinar' }}
               </ion-button>
             </ion-item>
 
-              <ion-card *ngIf="preguntasInspeccionadas[pregunta.id]" class="ion-margin-start ion-margin-end" color="light">
-                <ion-card-content>
-                  <p>
-                    <strong>Tu respuesta:</strong> 
-                    <span class="incorrecta" *ngIf="pregunta.userSeleccion !== pregunta.correctAnswer">
-                      {{ pregunta.options[pregunta.userSeleccion ?? -1] || 'No respondida' }}
-                    </span>
-                    <span *ngIf="pregunta.userSeleccion === pregunta.correctAnswer">
-                      {{ pregunta.options[pregunta.userSeleccion] || 'No respondida' }}
-                    </span>
-                  </p>
-                  <p><strong>Respuesta correcta:</strong> <span class="correcta">{{ pregunta.options[pregunta.correctAnswer] }}</span></p>
-                  <p><em>{{ pregunta.explicacion }}</em></p>
-                </ion-card-content>
-              </ion-card>
+            <ion-card *ngIf="preguntasInspeccionadas[pregunta?.id ?? 0]" class="ion-margin-start ion-margin-end" color="light">
+              <ion-card-content>
+                <p>
+                  <strong>Tu respuesta:</strong>
+                  <span class="incorrecta" *ngIf="(pregunta?.userSeleccion ?? -1) !== (pregunta?.correctAnswer ?? -1)">
+                    {{ pregunta?.options?.[pregunta?.userSeleccion ?? -1] ?? 'No respondida' }}
+                  </span>
+                  <span *ngIf="(pregunta?.userSeleccion ?? -1) === (pregunta?.correctAnswer ?? -1)">
+                    {{ pregunta?.options?.[pregunta?.userSeleccion ?? -1] ?? 'No respondida' }}
+                  </span>
+                </p>
 
+                <p>
+                  <strong>Respuesta correcta:</strong>
+                  <span class="correcta">{{ pregunta?.options?.[pregunta?.correctAnswer ?? 0] ?? 'No disponible' }}</span>
+                </p>
+
+                <p><em>{{ pregunta?.explicacion ?? '' }}</em></p>
+              </ion-card-content>
+            </ion-card>
 
           </ng-container>
         </ion-list>
       </div>
 
-      <ion-button expand="block" color="primary" (click)="irArbol(arbol.nombre)" class="ion-margin-top">
+      <ion-button expand="block" color="primary" (click)="irArbol(arbol?.nombre ?? '')" class="ion-margin-top">
         Reforzar Árbol
       </ion-button>
     </ion-card-content>

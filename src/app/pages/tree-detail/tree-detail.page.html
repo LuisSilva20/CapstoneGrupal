@@ -3,60 +3,51 @@
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Árboles de Conocimiento</ion-title>
+    <ion-title>Árbol: {{ treeName }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-grid>
-    <ion-row *ngFor="let tree of knowledgeTrees">
-      <ion-col size="12">
-        <ion-card class="tree-card">
-          <ion-img [src]="tree.icon" alt="Icono del árbol" class="tree-icon"></ion-img>
-          <ion-card-header>
-            <ion-card-title class="tree-title">{{ tree.name }}</ion-card-title>
-            <ion-card-subtitle class="tree-description">{{ tree.description }}</ion-card-subtitle>
-          </ion-card-header>
+  <ion-spinner *ngIf="cargando" name="crescent" class="ion-margin"></ion-spinner>
 
-          <ion-card-content>
-            <div class="skills-container">
-              <p *ngFor="let skill of tree.skills" class="skill-item">
-                {{ skill.name }} -
-                <ion-text [color]="skillColor(skill.level)">{{ skill.level }}%</ion-text>
-              </p>
-            </div>
+  <ng-container *ngIf="!cargando && cursos.length > 0">
+    <ion-grid>
+      <ion-row *ngFor="let course of cursos">
+        <ion-col size="12" size-md="6">
+          <ion-card class="course-card">
+            <ion-card-header>
+              <ion-card-title>{{ course.title }}</ion-card-title>
+              <ion-card-subtitle>{{ course.description }}</ion-card-subtitle>
+            </ion-card-header>
 
-            <ion-row class="courses-row">
-              <ion-col size="12" size-md="4" *ngFor="let course of tree.courses">
-                <ion-card class="course-card">
-                  <ion-img *ngIf="course.icon" [src]="course.icon" alt="Icono curso" class="course-icon"></ion-img>
-                  <ion-card-header>
-                    <ion-card-title class="course-title">{{ course.title }}</ion-card-title>
-                  </ion-card-header>
-                  <ion-card-content>
-                    <p>{{ course.description }}</p>
-                    <ion-progress-bar [value]="course.progress / 100"></ion-progress-bar>
-                    <ion-button expand="full" color="primary" (click)="markCourseAsLearned(course)">
-                      Marcar como aprendido
-                    </ion-button>
-                    <ion-button expand="full" color="secondary" (click)="goToCourse(course)">
-                      Examinar curso
-                    </ion-button>
-                  </ion-card-content>
-                </ion-card>
-              </ion-col>
-            </ion-row>
+            <ion-card-content>
+              <p>Progreso del curso:</p>
+              <ion-progress-bar [value]="course.progress / 100"></ion-progress-bar>
 
-            <!-- 🔹 Botón Dar Examen debajo del árbol -->
-            <div class="exam-button-container">
-              <ion-button expand="block" color="success" (click)="goToExam(tree)">
-                Dar examen del árbol
+              <ion-button expand="block" color="primary" (click)="markCourseAsLearned(course)">
+                Marcar como aprendido
               </ion-button>
-            </div>
 
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-  </ion-grid>
+              <ion-button expand="block" color="secondary" (click)="goToCourse(course)">
+                Ver lecciones
+              </ion-button>
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
+      </ion-row>
+
+      <!-- Botón para dar examen del árbol -->
+      <ion-row>
+        <ion-col size="12">
+          <ion-button expand="block" color="success" (click)="goToExam()">
+            Dar examen del árbol
+          </ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  </ng-container>
+
+  <ng-container *ngIf="!cargando && cursos.length === 0">
+    <p>No hay cursos disponibles para este árbol.</p>
+  </ng-container>
 </ion-content>

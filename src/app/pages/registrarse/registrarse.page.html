@@ -20,9 +20,10 @@
         </ion-card-header>
 
         <ion-card-content class="contenido">
-          <form [formGroup]="registerForm">
+          <form [formGroup]="registerForm" (ngSubmit)="registrarse()">
             <ion-list>
 
+              <!-- Nombre -->
               <ion-item>
                 <ion-label position="floating">Nombre</ion-label>
                 <ion-input type="text" formControlName="nombre"></ion-input>
@@ -33,6 +34,7 @@
                 <small *ngIf="f['nombre'].errors?.['pattern']">Solo letras y espacios.</small>
               </ion-text>
 
+              <!-- Apellidos -->
               <ion-item>
                 <ion-label position="floating">Apellidos</ion-label>
                 <ion-input type="text" formControlName="apellidos"></ion-input>
@@ -43,6 +45,7 @@
                 <small *ngIf="f['apellidos'].errors?.['pattern']">Solo letras y espacios.</small>
               </ion-text>
 
+              <!-- Email -->
               <ion-item>
                 <ion-label position="floating">Correo electrónico</ion-label>
                 <ion-input type="email" formControlName="email"></ion-input>
@@ -53,7 +56,7 @@
                 <small *ngIf="f['email'].errors?.['maxlength']">Máximo 50 caracteres.</small>
               </ion-text>
 
-
+              <!-- Usuario -->
               <ion-item>
                 <ion-label position="floating">Usuario</ion-label>
                 <ion-input type="text" formControlName="username"></ion-input>
@@ -65,6 +68,7 @@
                 <small *ngIf="f['username'].errors?.['pattern']">Solo letras, números y guiones bajos.</small>
               </ion-text>
 
+              <!-- Contraseña -->
               <ion-item>
                 <ion-label position="floating">Contraseña</ion-label>
                 <ion-input type="password" formControlName="password"></ion-input>
@@ -76,6 +80,7 @@
                 <small *ngIf="f['password'].errors?.['pattern']">Debe incluir letras y números.</small>
               </ion-text>
 
+              <!-- Confirmar Contraseña -->
               <ion-item>
                 <ion-label position="floating">Confirmar Contraseña</ion-label>
                 <ion-input type="password" formControlName="confirmPassword"></ion-input>
@@ -84,27 +89,24 @@
                 <small>Debes confirmar la contraseña.</small>
               </ion-text>
 
-              <ion-text
-                color="danger"
-                *ngIf="
-                  f['confirmPassword'].touched &&
-                  f['password'].value !== f['confirmPassword'].value
-                "
-              >
+              <ion-text color="danger" *ngIf="f['confirmPassword'].touched && f['password'].value !== f['confirmPassword'].value">
                 <small>Las contraseñas no coinciden.</small>
               </ion-text>
+
             </ion-list>
 
+            <!-- Botón Registrarse -->
             <ion-button
               expand="block"
               fill="solid"
               color="warning"
               shape="round"
-              (click)="Registrarse()"
+              type="submit"
               [disabled]="!registerForm.valid"
             >
               Registrarse
             </ion-button>
+
           </form>
         </ion-card-content>
       </ion-card>

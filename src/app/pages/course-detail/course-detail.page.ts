@@ -1,9 +1,9 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import {  IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonBackButton, IonButtons } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
 import { Curso } from '../../interfaces/interfaces';
-import { cursosData } from '../../data/cursos-data';
+import { Firestore, doc, getDoc } from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-course-detail',
@@ -12,20 +12,36 @@ import { cursosData } from '../../data/cursos-data';
   styleUrls: ['./course-detail.page.scss'],
   imports: [
     CommonModule,
-    IonicModule
+    IonHeader, IonToolbar, IonTitle, IonContent,
+    IonCard, IonCardHeader, IonCardTitle, IonCardContent,
+    IonBackButton, IonButtons
   ]
 })
 export class CourseDetailPage {
   curso?: Curso;
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(
+    private route: ActivatedRoute,
+    private firestore: Firestore
+  ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     const idParam = this.route.snapshot.paramMap.get('id');
-    const id = idParam ? Number(idParam) : null;
+    if (!idParam) return;
 
-    if (id !== null) {
-      this.curso = cursosData.find(c => c.id === id);
+    const id = idParam;
+
+    try {
+      const cursoRef = doc(this.firestore, `lessonContent/${id}`);
+      const cursoSnap = await getDoc(cursoRef);
+
+      if (cursoSnap.exists()) {
+        this.curso = cursoSnap.data() as Curso;
+      } else {
+        console.warn('Curso no encontrado en la base de datos');
+      }
+    } catch (err) {
+      console.error('Error al cargar curso:', err);
     }
   }
 }

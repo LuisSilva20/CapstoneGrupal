@@ -76,7 +76,7 @@ export class RegistrarsePage {
         Validators.maxLength(25),
         Validators.pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/),
       ]),
-      email: new FormControl('', [          // 👈 nuevo campo
+      email: new FormControl('', [
         Validators.required,
         Validators.email,
         Validators.maxLength(50),
@@ -95,10 +95,9 @@ export class RegistrarsePage {
       ]),
       confirmPassword: new FormControl('', [Validators.required]),
     });
-
   }
 
-  async Registrarse() {
+  async registrarse() {
     if (this.registerForm.invalid) {
       this.mostrarAlerta('Por favor completa todos los campos correctamente.');
       return;
@@ -122,13 +121,14 @@ export class RegistrarsePage {
     };
 
     try {
-      await this.api.CrearUsuario(usuario).toPromise();
+      // Crear usuario en Firestore
+      await this.api.crearUsuario(usuario).toPromise();
       this.mostrarAlerta('Usuario creado con éxito');
       this.registerForm.reset();
       this.router.navigate(['inicio-sesion']);
     } catch (error) {
-      this.mostrarAlerta('Error al crear el usuario');
       console.error(error);
+      this.mostrarAlerta('Error al crear el usuario');
     }
   }
 
