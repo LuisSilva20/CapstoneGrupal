@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
-import { Observable } from 'rxjs';
-import { Api } from 'src/app/servicios/api';
+import { Observable, from, map } from 'rxjs';
+import { Auth } from '@angular/fire/auth';
 import { ToastController } from '@ionic/angular';
 
 @Injectable({
@@ -11,17 +11,21 @@ export class IniciadoGuard implements CanActivate {
 
   constructor(
     private router: Router,
-    private api: Api,
+    private auth: Auth,
     private toastController: ToastController
   ) {}
 
-  canActivate(): boolean | Observable<boolean> | Promise<boolean> {
-    if (!this.api.isLogged()) {  // <-- Revisa sesión correctamente
-      this.showToast('Debe iniciar sesión');
-      this.router.navigateByUrl('/inicio-sesion');
-      return false;
-    }
-    return true;
+  canActivate(): Observable<boolean> {
+    return from(this.auth.currentUser ? Promise.resolve(true) : Promise.resolve(false)).pipe(
+      map(loggedIn => {
+        if (!loggedIn) {
+          this.showToast('Debe iniciar sesión');
+          this.router.navigateByUrl('/inicio-sesion');
+          return false;
+        }
+        return true;
+      })
+    );
   }
 
   private async showToast(msg: string) {

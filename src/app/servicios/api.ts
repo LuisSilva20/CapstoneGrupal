@@ -1,13 +1,11 @@
 import { Injectable, Inject } from '@angular/core';
-import { Firestore, collection, collectionData, addDoc, doc, updateDoc } from '@angular/fire/firestore';
-import { from, Observable, map } from 'rxjs';
-import { User, IntentoExamen, PreguntaExamen, KnowledgeTree, Curso, Leccion } from '../interfaces/interfaces';
+import { Firestore, collection, collectionData, addDoc, doc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { from, Observable, map, of } from 'rxjs';
+import { User, Curso, Leccion, PreguntaExamen, IntentoExamen, KnowledgeTree } from '../interfaces/interfaces';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class Api {
-  private usuariosCollection = 'users';
+  private usersCollection = 'users';
   private cursosCollection = 'cursos';
   private leccionesCollection = 'lecciones';
   private preguntasCollection = 'preguntas';
@@ -16,131 +14,61 @@ export class Api {
 
   constructor(@Inject(Firestore) private firestore: Firestore) {}
 
-  // ===========================
-  // ===== SESIÓN / LOGIN ======
-  // ===========================
-  isLogged(): boolean {
-    return !!sessionStorage.getItem('username'); // true si hay usuario en sesión
+  // 🔹 Crear usuario
+  crearUsuario(newUsuario: Omit<User, 'id'>, uid: string): Observable<User> {
+    const userDoc = doc(this.firestore, this.usersCollection, uid);
+    return from(setDoc(userDoc, { ...newUsuario, id: uid })).pipe(map(() => ({ ...newUsuario, id: uid })));
   }
 
-  // ===========================
-  // ===== USUARIOS ===========
-  // ===========================
-  listarUsuarios(): Observable<User[]> {
-    const usuariosRef = collection(this.firestore, this.usuariosCollection);
-    return collectionData(usuariosRef, { idField: 'id' }) as Observable<User[]>;
-  }
-
-  crearUsuario(newUsuario: Omit<User, 'id'>): Observable<User> {
-    const usuariosRef = collection(this.firestore, this.usuariosCollection);
-    return from(addDoc(usuariosRef, newUsuario)).pipe(
-      map(docRef => ({ id: docRef.id, ...newUsuario } as User))
-    );
-  }
-
-  getUserByUsername(username: string): Observable<User[]> {
-    return this.listarUsuarios().pipe(
-      map(users => users.filter(u => u.username?.toLowerCase() === username.toLowerCase()))
-    );
-  }
-
-  getUserByUsernameOrEmail(valor: string): Observable<User[]> {
-    const q = (valor || '').trim().toLowerCase();
-    if (!q) return from([]);
-    return this.listarUsuarios().pipe(
-      map(users => users.filter(
-        u => (u.username?.toLowerCase() === q) || (u.email.toLowerCase() === q)
-      ))
-    );
-  }
-
+  // 🔹 Actualizar usuario
   actualizarUsuario(id: string, datos: Partial<User>): Observable<void> {
-    const userDoc = doc(this.firestore, `${this.usuariosCollection}/${id}`);
+    if (!id) return of();
+    const userDoc = doc(this.firestore, this.usersCollection, id);
     return from(updateDoc(userDoc, datos));
   }
 
-  // ===========================
-  // ===== CURSOS ============
-  // ===========================
+  // 🔹 Cursos
   getAllCursos(): Observable<Curso[]> {
-    const cursosRef = collection(this.firestore, this.cursosCollection);
-    return collectionData(cursosRef, { idField: 'id' }) as Observable<Curso[]>;
+    return collectionData(collection(this.firestore, this.cursosCollection), { idField: 'id' }) as Observable<Curso[]>;
   }
-
   crearCurso(newCurso: Omit<Curso, 'id'>): Observable<Curso> {
-    const cursosRef = collection(this.firestore, this.cursosCollection);
-    return from(addDoc(cursosRef, newCurso)).pipe(
-      map(docRef => ({ id: docRef.id, ...newCurso } as Curso))
-    );
+    const ref = collection(this.firestore, this.cursosCollection);
+    return from(addDoc(ref, newCurso)).pipe(map(docRef => ({ ...newCurso, id: docRef.id })));
   }
 
-  // ===========================
-  // ===== LECCIONES ==========
-  // ===========================
+  // 🔹 Lecciones
   getLeccionesByCurso(cursoId: string | number): Observable<Leccion[]> {
-    const leccionesRef = collection(this.firestore, this.leccionesCollection);
-    return collectionData(leccionesRef, { idField: 'id' }).pipe(
-      map((lecciones: any[]) =>
-        lecciones
-          .map(l => ({ ...l } as Leccion))
-          .filter(l => l.cursoId.toString() === cursoId.toString())
-      )
+    return collectionData(collection(this.firestore, this.leccionesCollection), { idField: 'id' }).pipe(
+      map((lecciones: any[]) => lecciones.filter(l => l.cursoId?.toString() === cursoId.toString()))
     );
   }
-
   crearLeccion(newLeccion: Omit<Leccion, 'id'>): Observable<Leccion> {
-    const leccionesRef = collection(this.firestore, this.leccionesCollection);
-    return from(addDoc(leccionesRef, newLeccion)).pipe(
-      map(docRef => ({ id: docRef.id, ...newLeccion } as Leccion))
-    );
+    const ref = collection(this.firestore, this.leccionesCollection);
+    return from(addDoc(ref, newLeccion)).pipe(map(docRef => ({ ...newLeccion, id: docRef.id })));
   }
 
-  // ===========================
-  // ===== PREGUNTAS ==========
-  // ===========================
+  // 🔹 Preguntas
   getPreguntas(treeId?: string | number): Observable<PreguntaExamen[]> {
-    const preguntasRef = collection(this.firestore, this.preguntasCollection);
-    return collectionData(preguntasRef, { idField: 'id' }).pipe(
-      map((pregs: any[]) =>
-        pregs
-          .map(p => ({ ...p } as PreguntaExamen))
-          .filter(p => treeId ? p.treeId?.toString() === treeId.toString() : true)
-      )
+    return collectionData(collection(this.firestore, this.preguntasCollection), { idField: 'id' }).pipe(
+      map((pregs: any[]) => treeId ? pregs.filter(p => p.treeId?.toString() === treeId.toString()) : pregs)
     );
   }
 
-  // ===========================
-  // ===== RESULTADOS / INTENTOS
-  // ===========================
+  // 🔹 Resultados
   guardarIntento(usuarioId: string, respuestas: any[], score: number): Observable<IntentoExamen> {
-    const resultadosRef = collection(this.firestore, this.resultadosCollection);
-    const intento: IntentoExamen = {
-      usuarioId,
-      fecha: new Date().toISOString(),
-      respuestas,
-      puntaje: score,
-    };
-    return from(addDoc(resultadosRef, intento)).pipe(map(() => intento));
+    const intento: IntentoExamen = { usuarioId, fecha: new Date().toISOString(), respuestas, puntaje: score };
+    return from(addDoc(collection(this.firestore, this.resultadosCollection), intento)).pipe(map(() => intento));
   }
-
   getIntentos(usuarioId: string): Observable<IntentoExamen[]> {
-    const resultadosRef = collection(this.firestore, this.resultadosCollection);
-    return collectionData(resultadosRef, { idField: 'id' }).pipe(
-      map((res: any[]) =>
-        res
-          .map(r => ({ ...r } as IntentoExamen))
-          .filter(r => r.usuarioId === usuarioId)
-      )
+    return collectionData(collection(this.firestore, this.resultadosCollection), { idField: 'id' }).pipe(
+      map((res: any[]) => res.filter(r => r.usuarioId === usuarioId))
     );
   }
 
-  // ===========================
-  // ===== ÁRBOLES ============
-  // ===========================
+  // 🔹 Árboles
   getArboles(): Observable<KnowledgeTree[]> {
-    const treesRef = collection(this.firestore, this.arbolesCollection);
-    return collectionData(treesRef, { idField: 'id' }).pipe(
-      map((trees: any[]) => trees.map(t => ({ ...t } as KnowledgeTree)))
+    return collectionData(collection(this.firestore, this.arbolesCollection), { idField: 'id' }).pipe(
+      map((trees: any[]) => trees as KnowledgeTree[])
     );
   }
 }

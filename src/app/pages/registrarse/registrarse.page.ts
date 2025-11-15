@@ -1,47 +1,35 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
-import {
-  IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
-  IonButtons,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonButton,
-  IonBackButton,
-  IonInput,
-  IonText,
+  IonContent, IonHeader, IonTitle, IonToolbar, IonButtons, IonCard,
+  IonCardHeader, IonCardTitle, IonCardContent, IonList, IonItem, IonLabel,
+  IonButton, IonBackButton, IonInput, IonText
 } from '@ionic/angular/standalone';
 import { ToastController } from '@ionic/angular';
-import { Api } from 'src/app/servicios/api';
 import { Router } from '@angular/router';
+import { AuthService } from 'src/app/servicios/auth';
 import { User } from 'src/app/interfaces/interfaces';
+
+// Define un tipo para la respuesta de AuthService
+interface AuthResponse {
+  success: boolean;
+  user?: User;
+  error?: string;
+}
 
 @Component({
   selector: 'app-registrarse',
+  standalone: true,
   templateUrl: './registrarse.page.html',
   styleUrls: ['./registrarse.page.scss'],
-  standalone: true,
   imports: [
-    IonContent,
+    CommonModule,
     ReactiveFormsModule,
+    IonContent,
     IonHeader,
     IonTitle,
     IonToolbar,
-    CommonModule,
     IonButtons,
     IonCard,
     IonCardHeader,
@@ -53,47 +41,26 @@ import { User } from 'src/app/interfaces/interfaces';
     IonButton,
     IonBackButton,
     IonInput,
-    IonText,
-  ],
+    IonText
+  ]
 })
 export class RegistrarsePage {
   registerForm: FormGroup;
+  cargando = false;
 
   constructor(
-    private builder: FormBuilder,
-    private api: Api,
+    private fb: FormBuilder,
+    private authService: AuthService,
     private router: Router,
     private toastController: ToastController
   ) {
-    this.registerForm = this.builder.group({
-      nombre: new FormControl('', [
-        Validators.required,
-        Validators.maxLength(15),
-        Validators.pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/),
-      ]),
-      apellidos: new FormControl('', [
-        Validators.required,
-        Validators.maxLength(25),
-        Validators.pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/),
-      ]),
-      email: new FormControl('', [
-        Validators.required,
-        Validators.email,
-        Validators.maxLength(50),
-      ]),
-      username: new FormControl('', [
-        Validators.required,
-        Validators.minLength(8),
-        Validators.maxLength(16),
-        Validators.pattern(/^[a-zA-Z0-9_]+$/),
-      ]),
-      password: new FormControl('', [
-        Validators.required,
-        Validators.minLength(8),
-        Validators.maxLength(16),
-        Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]+$/),
-      ]),
-      confirmPassword: new FormControl('', [Validators.required]),
+    this.registerForm = this.fb.group({
+      nombre: new FormControl('', [Validators.required, Validators.maxLength(50)]),
+      apellidos: new FormControl('', [Validators.maxLength(50)]),
+      email: new FormControl('', [Validators.required, Validators.email, Validators.maxLength(100)]),
+      username: new FormControl('', [Validators.required, Validators.minLength(4), Validators.maxLength(30)]),
+      password: new FormControl('', [Validators.required, Validators.minLength(8)]),
+      confirmPassword: new FormControl('', [Validators.required])
     });
   }
 
@@ -104,31 +71,35 @@ export class RegistrarsePage {
     }
 
     const formValue = this.registerForm.value;
-
     if (formValue.password !== formValue.confirmPassword) {
       this.mostrarAlerta('Las contraseñas no coinciden.');
       return;
     }
 
-    const usuario: User = {
-      nombre: formValue.nombre.trim(),
-      apellidos: formValue.apellidos.trim(),
-      username: formValue.username.trim(),
-      email: formValue.email.trim(),
-      password: formValue.password,
-      confirmPassword: formValue.confirmPassword,
-      isactive: true,
-    };
-
+    this.cargando = true;
     try {
-      // Crear usuario en Firestore
-      await this.api.crearUsuario(usuario).toPromise();
+      const res: AuthResponse = await this.authService.registerWithEmail({
+        nombre: formValue.nombre.trim(),
+        apellidos: formValue.apellidos?.trim(),
+        email: formValue.email.trim(),
+        username: formValue.username.trim(),
+        password: formValue.password
+      });
+
+      if (!res.success) {
+        this.mostrarAlerta(res.error ?? 'Error al crear el usuario');
+        return;
+      }
+
       this.mostrarAlerta('Usuario creado con éxito');
       this.registerForm.reset();
       this.router.navigate(['inicio-sesion']);
-    } catch (error) {
-      console.error(error);
+
+    } catch (err: any) {
+      console.error('registrarse error', err);
       this.mostrarAlerta('Error al crear el usuario');
+    } finally {
+      this.cargando = false;
     }
   }
 
