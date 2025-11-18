@@ -29,13 +29,19 @@ export const routes: Routes = [
     canActivate: [IniciadoGuard]
   },
   {
-    path: 'tree-detail',
+    path: 'trees',
+    loadComponent: () =>
+      import('./pages/trees/trees.page').then(m => m.TreesPage),
+    canActivate: [IniciadoGuard]
+  },
+  {
+    path: 'tree-detail/:id',
     loadComponent: () =>
       import('./pages/tree-detail/tree-detail.page').then(m => m.TreeDetailPage),
     canActivate: [IniciadoGuard]
   },
   {
-    path: 'course-detail/:id',
+    path: 'course-detail/:treeId/:courseId',
     loadComponent: () =>
       import('./pages/course-detail/course-detail.page').then(m => m.CourseDetailPage),
     canActivate: [IniciadoGuard]

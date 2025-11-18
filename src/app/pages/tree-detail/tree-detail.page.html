@@ -3,32 +3,37 @@
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Árbol: {{ treeName }}</ion-title>
+    <ion-title>{{ tree?.title || 'Árbol' }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-spinner *ngIf="cargando" name="crescent" class="ion-margin"></ion-spinner>
 
-  <ng-container *ngIf="!cargando && cursos.length > 0">
-    <ion-grid>
-      <ion-row *ngFor="let course of cursos">
+  <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
+
+  <ng-container *ngIf="!cargando">
+
+    <ion-card *ngIf="tree">
+      <ion-card-header>
+        <ion-card-title>{{ tree.title }}</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p>{{ tree.description }}</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-grid *ngIf="cursos.length > 0">
+      <ion-row *ngFor="let c of cursos">
         <ion-col size="12" size-md="6">
-          <ion-card class="course-card">
+          <ion-card>
             <ion-card-header>
-              <ion-card-title>{{ course.title }}</ion-card-title>
-              <ion-card-subtitle>{{ course.description }}</ion-card-subtitle>
+              <ion-card-title>{{ c.title }}</ion-card-title>
             </ion-card-header>
 
             <ion-card-content>
-              <p>Progreso del curso:</p>
-              <ion-progress-bar [value]="course.progress / 100"></ion-progress-bar>
+              <p>{{ c.description }}</p>
 
-              <ion-button expand="block" color="primary" (click)="markCourseAsLearned(course)">
-                Marcar como aprendido
-              </ion-button>
-
-              <ion-button expand="block" color="secondary" (click)="goToCourse(course)">
+              <ion-button expand="block" color="primary" (click)="openCourse(c.id!)">
                 Ver lecciones
               </ion-button>
             </ion-card-content>
@@ -36,7 +41,6 @@
         </ion-col>
       </ion-row>
 
-      <!-- Botón para dar examen del árbol -->
       <ion-row>
         <ion-col size="12">
           <ion-button expand="block" color="success" (click)="goToExam()">
@@ -45,9 +49,9 @@
         </ion-col>
       </ion-row>
     </ion-grid>
+
+    <p *ngIf="cursos.length === 0">No hay cursos disponibles.</p>
+
   </ng-container>
 
-  <ng-container *ngIf="!cargando && cursos.length === 0">
-    <p>No hay cursos disponibles para este árbol.</p>
-  </ng-container>
 </ion-content>

@@ -1,9 +1,14 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {  IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonBackButton, IonButtons } from '@ionic/angular/standalone';
+import {
+  IonHeader, IonToolbar, IonTitle, IonContent, IonCard,
+  IonCardHeader, IonCardTitle, IonCardContent, IonBackButton, IonButtons, IonSpinner
+} from '@ionic/angular/standalone';
+
 import { ActivatedRoute } from '@angular/router';
-import { Curso } from '../../interfaces/interfaces';
-import { Firestore, doc, getDoc } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, collection, getDocs } from '@angular/fire/firestore';
+
+import { Curso, Leccion } from '../../interfaces/interfaces';
 
 @Component({
   selector: 'app-course-detail',
@@ -11,14 +16,22 @@ import { Firestore, doc, getDoc } from '@angular/fire/firestore';
   templateUrl: './course-detail.page.html',
   styleUrls: ['./course-detail.page.scss'],
   imports: [
+    IonSpinner,
     CommonModule,
     IonHeader, IonToolbar, IonTitle, IonContent,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonBackButton, IonButtons
+    IonButtons, IonBackButton
   ]
 })
-export class CourseDetailPage {
-  curso?: Curso;
+export class CourseDetailPage implements OnInit {
+
+  treeId!: string;
+  courseId!: string;
+
+  curso: Curso | null = null;
+  lessons: Leccion[] = [];
+  cargando = true;
+  errorMsg = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -26,22 +39,76 @@ export class CourseDetailPage {
   ) {}
 
   async ngOnInit() {
-    const idParam = this.route.snapshot.paramMap.get('id');
-    if (!idParam) return;
+    this.treeId = this.route.snapshot.paramMap.get('treeId') ?? '';
+    this.courseId = this.route.snapshot.paramMap.get('courseId') ?? '';
 
-    const id = idParam;
+    if (!this.treeId || !this.courseId) {
+      this.errorMsg = 'Datos insuficientes para cargar el curso.';
+      this.cargando = false;
+      return;
+    }
 
     try {
-      const cursoRef = doc(this.firestore, `lessonContent/${id}`);
-      const cursoSnap = await getDoc(cursoRef);
+      // 1) Intento principal: lessonContent/{courseId}
+      const ref = doc(this.firestore, `lessonContent/${this.courseId}`);
+      const snap = await getDoc(ref);
 
-      if (cursoSnap.exists()) {
-        this.curso = cursoSnap.data() as Curso;
+      if (snap.exists()) {
+        this.curso = this.normalizeCourse({ id: snap.id, ...snap.data() });
       } else {
-        console.warn('Curso no encontrado en la base de datos');
+        // 2) Alternativa: knowledgeTrees/{treeId}/courses/{courseId}
+        const altRef = doc(this.firestore, `knowledgeTrees/${this.treeId}/courses/${this.courseId}`);
+        const altSnap = await getDoc(altRef);
+
+        if (!altSnap.exists()) {
+          this.errorMsg = 'Curso no encontrado.';
+          return;
+        }
+
+        this.curso = this.normalizeCourse({ id: altSnap.id, ...altSnap.data() });
       }
+
+      // 3) Lecciones
+      if (this.curso?.lessons) {
+        this.lessons = this.curso.lessons.map(l => this.normalizeLesson(l));
+      } else {
+        const lessonsRef = collection(this.firestore, `knowledgeTrees/${this.treeId}/courses/${this.courseId}/lessons`);
+        const lessonsSnap = await getDocs(lessonsRef);
+        this.lessons = lessonsSnap.docs.map(d =>
+          this.normalizeLesson({ id: d.id, ...(d.data() as any) })
+        );
+      }
+
     } catch (err) {
-      console.error('Error al cargar curso:', err);
+      console.error(err);
+      this.errorMsg = 'Error cargando curso.';
+    } finally {
+      this.cargando = false;
     }
+  }
+
+  private normalizeCourse(raw: any): Curso {
+    const c: any = { ...(raw || {}) };
+
+    // Normalizar nombre del campo
+    c.title = c.title || c.titulo || '';
+    c.description = c.description || c.descripcion || '';
+    c.duration = c.duration || c.duracion || '';
+
+    c.id = c.id?.toString?.() ?? '';
+
+    return c as Curso;
+  }
+
+  private normalizeLesson(raw: any): Leccion {
+    const l: any = { ...(raw || {}) };
+
+    l.title = l.title || l.titulo || '';
+    l.content = l.content || l.contenido || l.htmlContent || '';
+    l.duration = l.duration || l.duracion || '';
+
+    l.id = l.id?.toString?.() ?? '';
+
+    return l as Leccion;
   }
 }

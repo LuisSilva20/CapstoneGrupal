@@ -3,48 +3,64 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/tree-detail"></ion-back-button>
     </ion-buttons>
-    <ion-title>{{ curso?.titulo || 'Curso' }}</ion-title>
+    <ion-title>{{ curso?.title || 'Curso' }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
 
-  <ng-container *ngIf="curso; else noCurso">
+  <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
 
-    <ion-card>
+  <div *ngIf="!cargando">
+
+    <div *ngIf="errorMsg">
+      <ion-card>
+        <ion-card-content>
+          <p>{{ errorMsg }}</p>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <ion-card *ngIf="curso">
       <ion-card-header>
-        <ion-card-title>{{ curso.titulo }}</ion-card-title>
+        <ion-card-title>{{ curso?.title }}</ion-card-title>
       </ion-card-header>
+
       <ion-card-content>
-        <p>{{ curso.descripcion }}</p>
+        <p>{{ curso?.description }}</p>
+
+        <p *ngIf="curso?.duration">
+          <strong>Duración:</strong> {{ curso?.duration }}
+        </p>
       </ion-card-content>
     </ion-card>
 
-    <ng-container *ngFor="let lesson of curso.lessons">
-      <ion-card>
+    <ng-container *ngIf="lessons?.length; else noLessons">
+      <ion-card *ngFor="let lesson of lessons">
         <ion-card-header>
-          <ion-card-title>{{ lesson.titulo }}</ion-card-title>
+          <ion-card-title>{{ lesson?.title }}</ion-card-title>
         </ion-card-header>
-        <ion-card-content>
-          <p>{{ lesson.contenido }}</p>
 
-          <ng-container *ngFor="let item of lesson.material">
-            <p *ngIf="item.tipo === 'texto'">{{ item.valor }}</p>
-            <img *ngIf="item.tipo === 'imagen'" [src]="item.valor" alt="Imagen del material" style="max-width:100%;">
-            <ul *ngIf="item.tipo === 'lista'">
-              <li *ngFor="let val of item.valor">{{ val }}</li>
-            </ul>
-          </ng-container>
+        <ion-card-content>
+
+          <div [innerHTML]="lesson?.content"></div>
+
+          <p *ngIf="lesson?.duration">
+            <strong>Duración:</strong> {{ lesson?.duration }}
+          </p>
+
         </ion-card-content>
       </ion-card>
     </ng-container>
-  </ng-container>
 
-  <ng-template #noCurso>
-    <ion-card>
-      <ion-card-content>
-        <p>No se encontró el curso seleccionado.</p>
-      </ion-card-content>
-    </ion-card>
-  </ng-template>
+    <ng-template #noLessons>
+      <ion-card>
+        <ion-card-content>
+          <p>No hay lecciones para este curso.</p>
+        </ion-card-content>
+      </ion-card>
+    </ng-template>
+
+  </div>
+
 </ion-content>

@@ -1,0 +1,38 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Árboles de Conocimiento</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
+
+  <ng-container *ngIf="!cargando">
+
+    <p *ngIf="errorMsg">{{ errorMsg }}</p>
+
+    <ion-grid *ngIf="trees.length > 0">
+      <ion-row *ngFor="let tree of trees">
+        <ion-col size="12" size-md="6">
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>{{ tree.title }}</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <p>{{ tree.description }}</p>
+              <ion-button expand="block" color="primary" (click)="abrirArbol(tree.id!.toString())">
+                Ver cursos
+              </ion-button>
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+
+  </ng-container>
+
+</ion-content>

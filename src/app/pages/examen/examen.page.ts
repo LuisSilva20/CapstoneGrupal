@@ -1,3 +1,4 @@
+// src/app/pages/examen/examen.page.ts
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -8,8 +9,22 @@ import {
   IonRadioGroup, IonRadio, IonButtons, IonMenuButton, IonSpinner
 } from '@ionic/angular/standalone';
 
-import { PreguntaExamen, Pregunta } from 'src/app/interfaces/interfaces';
+import { PreguntaExamen } from 'src/app/interfaces/interfaces';
 import { Api } from 'src/app/servicios/api';
+import { firstValueFrom } from 'rxjs';
+
+/**
+ * Interfaz local que usa los nombres que espera tu UI/template.
+ * No cambia nada en las interfaces globales.
+ */
+interface PreguntaLocal {
+  id: string;
+  texto: string;
+  opciones: string[];
+  correcta: number;
+  explicacion?: string;
+  treeId?: string | number;
+}
 
 @Component({
   selector: 'app-examen',
@@ -25,7 +40,7 @@ import { Api } from 'src/app/servicios/api';
   ]
 })
 export class ExamenPage implements OnInit {
-  preguntas: Pregunta[] = [];
+  preguntas: PreguntaLocal[] = [];
   respuestasUsuario: Record<string | number, number> = {};
   preguntaActual = 0;
   corregida = false;
@@ -48,62 +63,62 @@ export class ExamenPage implements OnInit {
     this.menuCtrl.toggle();
   }
 
-async cargarPreguntas() {
-  this.cargando = true;
+  async cargarPreguntas() {
+    this.cargando = true;
 
-  try {
-    // Trae todas las preguntas desde Firestore
-    const preguntasDB = await this.api.getPreguntas().toPromise() ?? [];
+    try {
+      // Trae todas las preguntas desde Firestore (PreguntaExamen[])
+      const preguntasDB: PreguntaExamen[] = (await firstValueFrom(this.api.getPreguntas())) ?? [];
 
-    // Filtra árboles únicos
-    const arboles = Array.from(new Set(preguntasDB.map(p => p.treeId))).filter(a => a);
+      // Filtra árboles únicos
+      const arboles = Array.from(new Set(preguntasDB.map(p => p.treeId))).filter(a => a);
 
-    const preguntasPorArbol: Pregunta[] = [];
+      const preguntasPorArbol: PreguntaLocal[] = [];
 
-    // Selecciona 3 preguntas aleatorias por árbol
-    arboles.forEach(arbol => {
-      const preguntasDelArbol = preguntasDB.filter(p => p.treeId === arbol);
-      preguntasDelArbol.sort(() => Math.random() - 0.5);
-      preguntasDelArbol.slice(0, 3).forEach(p => {
-        preguntasPorArbol.push({
-          id: (preguntasPorArbol.length + 1).toString(),
-          texto: p.question,
-          opciones: p.options,
-          correcta: Number(p.correctAnswer),
-          explicacion: p.explicacion ?? '',
-          treeId: p.treeId
+      // 3 preguntas por árbol (aleatorias)
+      arboles.forEach(arbol => {
+        const preguntasDelArbol = preguntasDB.filter(p => p.treeId === arbol);
+        preguntasDelArbol.sort(() => Math.random() - 0.5);
+        preguntasDelArbol.slice(0, 3).forEach(p => {
+          preguntasPorArbol.push({
+            id: (preguntasPorArbol.length + 1).toString(),
+            texto: p.question,
+            opciones: p.options,
+            correcta: Number(p.correctAnswer),
+            explicacion: p.explicacion ?? '',
+            treeId: p.treeId
+          });
         });
       });
-    });
 
-    // Completa hasta 35 preguntas totales
-    const restantes = 35 - preguntasPorArbol.length;
-    if (restantes > 0) {
-      const usadas = preguntasPorArbol.map(p => p.texto);
-      const disponibles = preguntasDB.filter(p => !usadas.includes(p.question));
-      disponibles.sort(() => Math.random() - 0.5);
-      disponibles.slice(0, restantes).forEach(p => {
-        preguntasPorArbol.push({
-          id: (preguntasPorArbol.length + 1).toString(),
-          texto: p.question,
-          opciones: p.options,
-          correcta: Number(p.correctAnswer),
-          explicacion: p.explicacion ?? '',
-          treeId: p.treeId
+      // Completar hasta 35 preguntas
+      const restantes = 35 - preguntasPorArbol.length;
+      if (restantes > 0) {
+        const usadas = preguntasPorArbol.map(p => p.texto);
+        const disponibles = preguntasDB.filter(p => !usadas.includes(p.question));
+        disponibles.sort(() => Math.random() - 0.5);
+        disponibles.slice(0, restantes).forEach(p => {
+          preguntasPorArbol.push({
+            id: (preguntasPorArbol.length + 1).toString(),
+            texto: p.question,
+            opciones: p.options,
+            correcta: Number(p.correctAnswer),
+            explicacion: p.explicacion ?? '',
+            treeId: p.treeId
+          });
         });
-      });
+      }
+
+      // Mezcla final
+      this.preguntas = preguntasPorArbol.sort(() => Math.random() - 0.5);
+
+    } catch (error) {
+      console.error('Error cargando preguntas:', error);
+      this.preguntas = [];
+    } finally {
+      this.cargando = false;
     }
-
-    // Mezcla final
-    this.preguntas = preguntasPorArbol.sort(() => Math.random() - 0.5);
-
-  } catch (error) {
-    console.error('Error cargando preguntas:', error);
-    this.preguntas = [];
-  } finally {
-    this.cargando = false;
   }
-}
 
   comenzarExamen() {
     this.mostrarReglas = false;
