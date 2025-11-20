@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, MenuController } from '@ionic/angular';
+import { MenuController } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { Api } from 'src/app/servicios/api';
 
@@ -43,7 +43,7 @@ interface ArbolEstadistica {
   templateUrl: './estadisticas.page.html',
   styleUrls: ['./estadisticas.page.scss'],
   imports: [
-    CommonModule, IonicModule,
+    CommonModule,
     IonHeader, IonToolbar, IonTitle, IonContent,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonList, IonItem, IonLabel, IonProgressBar, IonButton,

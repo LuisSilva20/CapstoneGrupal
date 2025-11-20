@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import {
@@ -6,7 +6,8 @@ import {
   IonContent, IonList, IonItem, IonIcon, IonMenuToggle,
   IonLabel, IonRouterOutlet
 } from '@ionic/angular/standalone';
-import { Auth, onAuthStateChanged, signOut } from '@angular/fire/auth';
+
+import { Auth, signOut, user as authUser } from '@angular/fire/auth';
 
 interface Componente {
   name: string;
@@ -26,22 +27,27 @@ interface Componente {
     IonLabel, IonRouterOutlet
   ]
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
+
   nombre: string = 'Usuario';
 
   componentes: Componente[] = [
     { name: 'Perfil', redirecTo: '/perfil', icon: 'person-outline' },
     { name: 'Inicio', redirecTo: '/inicio', icon: 'home-outline' },
-    { name: 'Cursos', redirecTo: '/trees', icon: 'school-outline' }, // navegamos directo
+    { name: 'Cursos', redirecTo: '/trees', icon: 'school-outline' },
     { name: 'Examen', redirecTo: '/examen', icon: 'reader-outline' },
     { name: 'Estadisticas', redirecTo: '/estadisticas', icon: 'stats-chart-outline' },
     { name: 'Cerrar Sesión', action: () => this.cerrarSesion(), icon: 'log-out-outline' }
   ];
 
-  constructor(private router: Router, private auth: Auth) {}
+
+  constructor(
+    private router: Router,
+    private auth: Auth
+  ) {}
 
   ngOnInit() {
-    onAuthStateChanged(this.auth, (user) => {
+    authUser(this.auth).subscribe(user => {
       this.nombre = user?.displayName || user?.email || 'Usuario';
     });
   }

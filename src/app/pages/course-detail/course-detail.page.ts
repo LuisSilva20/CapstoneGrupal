@@ -2,13 +2,13 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonCard,
-  IonCardHeader, IonCardTitle, IonCardContent, IonBackButton, IonButtons, IonSpinner
+  IonCardHeader, IonCardTitle, IonCardContent, IonBackButton, IonButtons, IonSpinner, IonButton
 } from '@ionic/angular/standalone';
 
 import { ActivatedRoute } from '@angular/router';
-import { Firestore, doc, getDoc, collection, getDocs } from '@angular/fire/firestore';
-
 import { Curso, Leccion } from '../../interfaces/interfaces';
+import { LearningService } from '../../servicios/learning.service';
+import { Auth } from '@angular/fire/auth';
 
 @Component({
   selector: 'app-course-detail',
@@ -16,7 +16,7 @@ import { Curso, Leccion } from '../../interfaces/interfaces';
   templateUrl: './course-detail.page.html',
   styleUrls: ['./course-detail.page.scss'],
   imports: [
-    IonSpinner,
+    IonSpinner, IonButton,
     CommonModule,
     IonHeader, IonToolbar, IonTitle, IonContent,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
@@ -32,10 +32,12 @@ export class CourseDetailPage implements OnInit {
   lessons: Leccion[] = [];
   cargando = true;
   errorMsg = '';
+  cursoCompletado = false;
 
   constructor(
     private route: ActivatedRoute,
-    private firestore: Firestore
+    private learningService: LearningService,
+    private auth: Auth
   ) {}
 
   async ngOnInit() {
@@ -49,34 +51,35 @@ export class CourseDetailPage implements OnInit {
     }
 
     try {
-      // 1) Intento principal: lessonContent/{courseId}
-      const ref = doc(this.firestore, `lessonContent/${this.courseId}`);
-      const snap = await getDoc(ref);
+      // Traer curso
+      const cursos = await this.learningService.getCoursesByTree(this.treeId);
+      this.curso = cursos.find(c => c.id?.toString() === this.courseId) || null;
 
-      if (snap.exists()) {
-        this.curso = this.normalizeCourse({ id: snap.id, ...snap.data() });
-      } else {
-        // 2) Alternativa: knowledgeTrees/{treeId}/courses/{courseId}
-        const altRef = doc(this.firestore, `knowledgeTrees/${this.treeId}/courses/${this.courseId}`);
-        const altSnap = await getDoc(altRef);
+      // Traer lecciones
+      this.lessons = await this.learningService.getLessons(this.courseId);
 
-        if (!altSnap.exists()) {
-          this.errorMsg = 'Curso no encontrado.';
-          return;
+      // 🔹 Obtener progreso real del usuario desde Firestore
+      const uid = this.auth.currentUser?.uid;
+      let completedCourses: string[] = [];
+      if (uid) {
+        const user = await this.learningService.getUserByUid(uid);
+        if (user?.learningProgress?.[this.treeId]) {
+          completedCourses = Array.from(new Set(
+            user.learningProgress[this.treeId]
+              .map(id => id?.toString())
+              .filter(id => !!id)
+          ));
         }
-
-        this.curso = this.normalizeCourse({ id: altSnap.id, ...altSnap.data() });
       }
 
-      // 3) Lecciones
-      if (this.curso?.lessons) {
-        this.lessons = this.curso.lessons.map(l => this.normalizeLesson(l));
-      } else {
-        const lessonsRef = collection(this.firestore, `knowledgeTrees/${this.treeId}/courses/${this.courseId}/lessons`);
-        const lessonsSnap = await getDocs(lessonsRef);
-        this.lessons = lessonsSnap.docs.map(d =>
-          this.normalizeLesson({ id: d.id, ...(d.data() as any) })
-        );
+      // Determinar si el curso actual ya está completado
+      this.cursoCompletado = completedCourses.includes(this.courseId);
+
+      // 🔹 Sincronizar localStorage
+      const completadosLS: Record<string, number> = {};
+      completedCourses.forEach(cid => completadosLS[cid] = 1);
+      if (this.cursoCompletado) {
+        localStorage.setItem('completedCourses', JSON.stringify(completadosLS));
       }
 
     } catch (err) {
@@ -87,28 +90,38 @@ export class CourseDetailPage implements OnInit {
     }
   }
 
-  private normalizeCourse(raw: any): Curso {
-    const c: any = { ...(raw || {}) };
+  async markAsCompleted() {
+    try {
+      const uid = this.auth.currentUser?.uid;
+      if (!uid) {
+        alert('No hay usuario autenticado');
+        return;
+      }
 
-    // Normalizar nombre del campo
-    c.title = c.title || c.titulo || '';
-    c.description = c.description || c.descripcion || '';
-    c.duration = c.duration || c.duracion || '';
+      // Preparar lecciones/cursos para guardado
+      const lessonsTransformed = this.lessons.map(lesson => ({
+        id: lesson.id?.toString(),
+        titulo: lesson.title || 'Lección sin título',
+        completed: true,
+        fecha: new Date().toISOString()
+      }));
 
-    c.id = c.id?.toString?.() ?? '';
+      await this.learningService.saveCourseProgress(
+        uid,
+        { id: this.courseId.toString(), title: this.curso?.title || '', lessons: lessonsTransformed },
+        this.treeId
+      );
 
-    return c as Curso;
-  }
+      // 🔹 Actualizar localStorage para barra de progreso instantánea
+      const completadosLS: Record<string, number> = JSON.parse(localStorage.getItem('completedCourses') || '{}');
+      completadosLS[this.courseId] = 1;
+      localStorage.setItem('completedCourses', JSON.stringify(completadosLS));
 
-  private normalizeLesson(raw: any): Leccion {
-    const l: any = { ...(raw || {}) };
-
-    l.title = l.title || l.titulo || '';
-    l.content = l.content || l.contenido || l.htmlContent || '';
-    l.duration = l.duration || l.duracion || '';
-
-    l.id = l.id?.toString?.() ?? '';
-
-    return l as Leccion;
+      this.cursoCompletado = true;
+      alert('¡Curso marcado como completado!');
+    } catch (err) {
+      console.error('Error al marcar el curso como completado:', err);
+      alert('Hubo un error al marcar el curso como completado.');
+    }
   }
 }

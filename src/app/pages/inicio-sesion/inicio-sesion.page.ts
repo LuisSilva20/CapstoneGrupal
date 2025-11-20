@@ -11,7 +11,6 @@ import { ToastController, AlertController } from '@ionic/angular';
 import { AuthService } from 'src/app/servicios/auth';
 import { User } from 'src/app/interfaces/interfaces';
 
-// Interfaz para tipar la respuesta de AuthService
 interface AuthResponse {
   success: boolean;
   user?: User;
@@ -44,6 +43,7 @@ interface AuthResponse {
   ],
 })
 export class InicioSesionPage {
+
   inicioSesionForm: FormGroup;
   cargando = false;
 
@@ -60,22 +60,44 @@ export class InicioSesionPage {
     });
   }
 
+  private esEmail(valor: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
+  }
+
   async iniciarSesion() {
     if (!this.inicioSesionForm.valid) return;
 
-    const { identifier, password } = this.inicioSesionForm.value;
+    let { identifier, password } = this.inicioSesionForm.value;
+
+    identifier = identifier.trim();
 
     this.cargando = true;
     try {
-      const res: AuthResponse = await this.authService.loginWithEmail(identifier, password);
+      let res: AuthResponse;
+
+      // Si es un correo → login con email
+      if (this.esEmail(identifier)) {
+        res = await this.authService.loginWithEmail(identifier, password);
+      }
+      // Si NO lo es → login con nombre de usuario
+      else {
+        res = await this.authService.login(identifier, password)
+;
+      }
+
       if (!res.success) {
         this.showAlert('Error', res.error ?? 'Error al iniciar sesión');
         return;
       }
 
-      const toast = await this.toastCtrl.create({ message: 'Sesión iniciada!', duration: 2000 });
+      const toast = await this.toastCtrl.create({
+        message: 'Sesión iniciada!',
+        duration: 2000,
+      });
+
       toast.present();
       this.router.navigateByUrl('/inicio');
+
     } finally {
       this.cargando = false;
     }
@@ -83,23 +105,35 @@ export class InicioSesionPage {
 
   async loginGoogle() {
     this.cargando = true;
+
     try {
       const res: AuthResponse = await this.authService.loginWithGoogle();
+
       if (!res.success) {
         this.showAlert('Error', res.error ?? 'Error al iniciar sesión con Google');
         return;
       }
 
-      const toast = await this.toastCtrl.create({ message: 'Sesión con Google iniciada!', duration: 2000 });
+      const toast = await this.toastCtrl.create({
+        message: 'Sesión con Google iniciada!',
+        duration: 2000,
+      });
+
       toast.present();
       this.router.navigateByUrl('/inicio');
+
     } finally {
       this.cargando = false;
     }
   }
 
   private async showAlert(header: string, message: string) {
-    const alert = await this.alertCtrl.create({ header, message, buttons: ['OK'] });
+    const alert = await this.alertCtrl.create({
+      header,
+      message,
+      buttons: ['OK'],
+    });
+
     alert.present();
   }
 }

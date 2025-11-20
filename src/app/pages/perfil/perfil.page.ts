@@ -1,61 +1,55 @@
+// src/app/pages/perfil/perfil.page.ts
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle,
   IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonList, IonItem, IonLabel, IonProgressBar, IonButton, IonAvatar,
-  IonMenuButton, IonButtons, IonIcon
+  IonMenuButton, IonButtons, IonIcon, ToastController
 } from '@ionic/angular/standalone';
 import { Router } from '@angular/router';
 import { MenuController } from '@ionic/angular';
-import { Firestore, collection, collectionData } from '@angular/fire/firestore';
-import { firstValueFrom, Observable } from 'rxjs';
+import { Auth } from '@angular/fire/auth';
+import { firstValueFrom } from 'rxjs';
+import { Api } from 'src/app/servicios/api';
 
-interface CursoFirebase {
-  id: string | number;
-  titulo: string;
-  descripcion: string;
-  duracion: string;
-  lessons?: { titulo: string; completed: boolean; fecha?: string }[];
-  arbol?: string;
-}
-
-interface CursoGuardado {
-  id: string | number;
+interface CursoGuardadoView {
+  id: string;
   title: string;
-  descripcion: string;
-  duracion: string;
-  lessons?: { titulo: string; completed: boolean; fecha?: string }[];
+  descripcion?: string;
+  duracion?: string;
   arbol?: string;
   progreso: number;
   mostrarDetalle?: boolean;
 }
 
-interface IntentoExamen {
-  id: string | number;
-  fecha: string;
-  respuestas: { texto: string; opciones: string[]; seleccion: number; correcta: number; explicacion?: string; treeId?: string }[];
+interface RespuestaView {
+  texto?: string;
+  opciones?: string[];
+  seleccion?: number | null;
+  correcta?: number | null;
+  treeId?: string;
+  explicacion?: string;
+}
+
+interface IntentoView {
+  id?: string;
+  fecha?: string;
+  respuestas: RespuestaView[];
   puntaje?: number;
   fechaFormateada?: string;
   mostrarDetalle?: boolean;
 }
 
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  nombre: string;
-  apellidos: string;
-  password: string;
-  isactive: boolean;
+interface UserView {
+  id?: string;
+  username?: string;
+  email?: string;
+  nombre?: string;
+  apellidos?: string;
+  learningProgress?: { [treeId: string]: any };
+  examHistory?: any[];
   progreso?: number;
-}
-
-interface ArbolPerfil {
-  nombre: string;
-  totalAciertos: number;
-  totalErrores: number;
-  porcentajeAciertos: number;
 }
 
 @Component({
@@ -72,97 +66,162 @@ interface ArbolPerfil {
   ]
 })
 export class PerfilPage {
-  usuario: User | null = null;
-  cursos: CursoGuardado[] = [];
-  intentos: IntentoExamen[] = [];
-  arboles: ArbolPerfil[] = [];
-  fortalezas: ArbolPerfil[] = [];
-  debilidades: ArbolPerfil[] = [];
+  usuario: UserView | null = null;
+  cursos: CursoGuardadoView[] = [];
+  intentos: IntentoView[] = [];
+
+  arboles: { nombre: string; totalAciertos: number; totalErrores: number; porcentajeAciertos: number }[] = [];
+  fortalezas: any[] = [];
+  debilidades: any[] = [];
+
+  cargando = false;
 
   constructor(
     private router: Router,
     private menuCtrl: MenuController,
-    private firestore: Firestore
+    private auth: Auth,
+    private api: Api,
+    private toastCtrl: ToastController
   ) {}
 
-  async ionViewWillEnter() {
-    await this.cargarUsuario();
-    await this.cargarCursos();
-    await this.cargarIntentos();
-    this.calcularEstadisticasArboles();
-    this.calcularProgresoGeneral();
-  }
+  ionViewWillEnter() {
+    this.cargando = true;
+    const uid = this.auth.currentUser?.uid ?? null;
+    if (!uid) {
+      this.presentToast('No hay usuario autenticado. Inicia sesión.').then(() => {
+        this.router.navigateByUrl('/inicio-sesion');
+      });
+      return;
+    }
 
-  async cargarUsuario() {
-    const username = sessionStorage.getItem('username');
-    if (!username) return;
+    this.api.getUserFullDataOnce(uid).then(user => {
+      if (!user) {
+        this.presentToast('Usuario no encontrado.');
+        this.usuario = null;
+        this.cursos = [];
+        this.intentos = [];
+        this.cargando = false;
+        return;
+      }
 
-    this.usuario = {
-      id: 1,
-      username,
-      email: sessionStorage.getItem('email') ?? '',
-      nombre: sessionStorage.getItem('nombre') ?? '',
-      apellidos: sessionStorage.getItem('apellidos') ?? '',
-      password: '',
-      isactive: true
-    };
-  }
-
-  async cargarCursos() {
-    const cursosCol = collection(this.firestore, 'cursos');
-    const cursosFirebase: CursoFirebase[] = await firstValueFrom(
-      collectionData(cursosCol, { idField: 'id' }) as Observable<CursoFirebase[]>
-    );
-
-    this.cursos = cursosFirebase.map(c => ({
-      id: c.id,
-      title: c.titulo ?? 'Sin título',
-      descripcion: c.descripcion ?? '',
-      duracion: c.duracion ?? '',
-      lessons: c.lessons ?? [],
-      arbol: c.arbol ?? 'Sin categoría',
-      progreso: c.lessons?.length
-        ? Math.round((c.lessons.filter(l => l.completed).length / c.lessons.length) * 100)
-        : 0,
-      mostrarDetalle: false
-    }));
-  }
-
-  async cargarIntentos() {
-    const intentosCol = collection(this.firestore, 'intentos');
-    const intentosFirebase: IntentoExamen[] = await firstValueFrom(
-      collectionData(intentosCol, { idField: 'id' }) as Observable<IntentoExamen[]>
-    );
-
-    this.intentos = intentosFirebase.map(i => {
-      const respuestas = i.respuestas ?? [];
-      const correctas = respuestas.reduce((acc, r) => r.seleccion === r.correcta ? acc + 1 : acc, 0);
-      return {
-        ...i,
-        puntaje: respuestas.length ? (correctas / respuestas.length) * 100 : 0,
-        fechaFormateada: i.fecha
-          ? new Date(i.fecha).toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })
-          : '',
-        mostrarDetalle: false
+      this.usuario = {
+        id: user.id,
+        username: user.username ?? (user.email ? user.email.split('@')[0] : ''),
+        email: user.email,
+        nombre: (user as any).nombre ?? '',
+        apellidos: user.apellidos ?? '',
+        learningProgress: user.learningProgress ?? {},
+        examHistory: user.examHistory ?? [],
+        progreso: 0
       };
-    }).sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? ''));
+
+      // Usar combineLatest para obtener cursos y árboles en paralelo
+      const cursos$ = this.api.getAllCursos();
+      const arboles$ = this.api.getArboles();
+      const intentos$ = this.api.getIntentosByUsuario(uid);
+
+      cursos$.subscribe(allCursos => {
+        arboles$.subscribe(allArboles => {
+          // 3) Construcción de cursos guardados
+          const lp = this.usuario!.learningProgress ?? {};
+          const keys = Object.keys(lp);
+
+          this.cursos = keys.map(treeId => {
+            // Extraer el número de la clave (ej: 'tree-1' => '1')
+            const treeIdNum = treeId.replace('tree-', '');
+            const found = allCursos.find(c =>
+              c.id?.toString() === treeIdNum ||
+              c.arbolId?.toString() === treeIdNum
+            );
+
+            const arbolName =
+              allArboles.find(a => a.id?.toString() === found?.arbolId?.toString() || a.id?.toString() === treeIdNum)?.title
+              ?? 'Sin categoría';
+
+            const lessonsCompleted = Array.isArray(lp[treeId]) ? lp[treeId].length : Number(lp[treeId]) || 0;
+
+            const totalLessons = (found?.lessons?.length ?? lessonsCompleted) || 1;
+
+            const progreso = Math.round((lessonsCompleted / totalLessons) * 100);
+
+            return {
+              id: found?.id ?? treeIdNum,
+              title: found?.title ?? treeId,
+              descripcion: found?.description ?? '',
+              duracion: found?.duration ?? '',
+              arbol: arbolName,
+              progreso,
+              mostrarDetalle: false
+            };
+          });
+
+          // 4) Cargar intentos/exámenes
+          intentos$.subscribe(intentosRaw => {
+            this.intentos = (intentosRaw || []).map(it => {
+              const respuestas = (it.respuestas ?? []).map((r: any) => ({
+                texto: r.texto ?? '',
+                opciones: Array.isArray(r.opciones) ? r.opciones : [],
+                seleccion: r.seleccion ?? null,
+                correcta: r.correcta ?? null,
+                treeId: r.treeId ?? '',
+                explicacion: r.explicacion ?? ''
+              }));
+
+              const fechaOriginal = it.fecha ?? new Date().toISOString();
+
+              const correctas = respuestas.filter(x => x.seleccion === x.correcta).length;
+              const puntaje = respuestas.length
+                ? Math.round((correctas / respuestas.length) * 100)
+                : 0;
+
+              return {
+                id: it.id,
+                fecha: fechaOriginal,
+                respuestas,
+                puntaje,
+                fechaFormateada: new Date(fechaOriginal).toLocaleString('es-ES'),
+                mostrarDetalle: false
+              };
+            });
+
+            // 5) Estadísticas
+            this.calcularEstadisticasArboles();
+            this.calcularProgresoGeneral();
+            this.cargando = false;
+          });
+        });
+      });
+    }).catch(err => {
+      console.error(err);
+      this.presentToast('Error cargando perfil.');
+      this.cargando = false;
+    });
+  }
+
+  private async presentToast(message: string) {
+    const t = await this.toastCtrl.create({ message, duration: 2200, position: 'bottom' });
+    await t.present();
   }
 
   calcularEstadisticasArboles() {
-    const arbolMap: { [key: string]: ArbolPerfil } = {};
+    const mapa: any = {};
 
     this.intentos.slice(0, 3).forEach(i => {
-      i.respuestas?.forEach(r => {
-        const treeName = r.treeId?.trim() ?? 'Sin Categoría';
-        if (!arbolMap[treeName]) arbolMap[treeName] = { nombre: treeName, totalAciertos: 0, totalErrores: 0, porcentajeAciertos: 0 };
-        r.seleccion === r.correcta ? arbolMap[treeName].totalAciertos++ : arbolMap[treeName].totalErrores++;
+      i.respuestas.forEach(r => {
+        const tree = (r.treeId ?? 'Sin categoría').toString();
+        if (!mapa[tree]) mapa[tree] = { nombre: tree, totalAciertos: 0, totalErrores: 0 };
+
+        if (r.seleccion === r.correcta) mapa[tree].totalAciertos++;
+        else mapa[tree].totalErrores++;
       });
     });
 
-    this.arboles = Object.values(arbolMap).map(a => {
+    this.arboles = Object.values(mapa).map((a: any) => {
       const total = a.totalAciertos + a.totalErrores;
-      a.porcentajeAciertos = total > 0 ? (a.totalAciertos / total) * 100 : 100;
-      return a;
+      return {
+        ...a,
+        porcentajeAciertos: total ? Math.round((a.totalAciertos / total) * 100) : 0
+      };
     });
 
     this.fortalezas = this.arboles.filter(a => a.porcentajeAciertos >= 75);
@@ -171,29 +230,31 @@ export class PerfilPage {
 
   calcularProgresoGeneral() {
     if (!this.usuario) return;
-    const totalCursos = this.cursos.length;
-    this.usuario.progreso = totalCursos > 0
-      ? Math.round(this.cursos.reduce((acc, c) => acc + (c.progreso ?? 0), 0) / totalCursos)
+
+    const total = this.cursos.length;
+    this.usuario.progreso = total
+      ? Math.round(this.cursos.reduce((acc, c) => acc + (c.progreso ?? 0), 0) / total)
       : 0;
   }
 
-  toggleDetalleCurso(curso: CursoGuardado) { curso.mostrarDetalle = !curso.mostrarDetalle; }
-  toggleDetalleExamen(intento: IntentoExamen) { intento.mostrarDetalle = !intento.mostrarDetalle; }
+  toggleDetalleExamen(intento: IntentoView) {
+    intento.mostrarDetalle = !intento.mostrarDetalle;
+  }
 
-  eliminarExamen(index: number) {
-    this.intentos.splice(index, 1);
-    this.calcularEstadisticasArboles();
+  eliminarExamen(i: number) {
+    this.intentos.splice(i, 1);
   }
 
   eliminarTodosExamenes() {
     this.intentos = [];
-    this.calcularEstadisticasArboles();
   }
 
-  toggleMenu() { this.menuCtrl.toggle(); }
+  toggleMenu() {
+    this.menuCtrl.toggle();
+  }
 
-  irArbol(nombreArbol: string | undefined) {
-    if (!nombreArbol) return; // evita pasar undefined
+  irArbol(nombreArbol?: string) {
+    if (!nombreArbol) return;
     sessionStorage.setItem('selectedTree', nombreArbol);
     this.router.navigateByUrl('/tree-detail');
   }

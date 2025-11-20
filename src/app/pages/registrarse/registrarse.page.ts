@@ -4,19 +4,12 @@ import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } 
 import {
   IonContent, IonHeader, IonTitle, IonToolbar, IonButtons, IonCard,
   IonCardHeader, IonCardTitle, IonCardContent, IonList, IonItem, IonLabel,
-  IonButton, IonBackButton, IonInput, IonText
+  IonButton, IonBackButton, IonInput
 } from '@ionic/angular/standalone';
 import { ToastController } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { AuthService } from 'src/app/servicios/auth';
-import { User } from 'src/app/interfaces/interfaces';
-
-// Define un tipo para la respuesta de AuthService
-interface AuthResponse {
-  success: boolean;
-  user?: User;
-  error?: string;
-}
+import { User, AuthResponse } from 'src/app/interfaces/interfaces';
 
 @Component({
   selector: 'app-registrarse',
@@ -40,8 +33,7 @@ interface AuthResponse {
     IonLabel,
     IonButton,
     IonBackButton,
-    IonInput,
-    IonText
+    IonInput
   ]
 })
 export class RegistrarsePage {
@@ -71,20 +63,30 @@ export class RegistrarsePage {
     }
 
     const formValue = this.registerForm.value;
+
     if (formValue.password !== formValue.confirmPassword) {
       this.mostrarAlerta('Las contraseñas no coinciden.');
       return;
     }
 
     this.cargando = true;
+
     try {
-      const res: AuthResponse = await this.authService.registerWithEmail({
+      const userData: Omit<User, 'id'> = {
         nombre: formValue.nombre.trim(),
         apellidos: formValue.apellidos?.trim(),
         email: formValue.email.trim(),
         username: formValue.username.trim(),
-        password: formValue.password
-      });
+        password: formValue.password,
+        confirmPassword: formValue.confirmPassword,
+        isactive: true,
+        examHistory: [],
+        learningProgress: {},
+        cursosCompletados: [],
+        progreso: 0
+      };
+
+      const res: AuthResponse = await this.authService.register(userData, formValue.password);
 
       if (!res.success) {
         this.mostrarAlerta(res.error ?? 'Error al crear el usuario');
@@ -95,8 +97,7 @@ export class RegistrarsePage {
       this.registerForm.reset();
       this.router.navigate(['inicio-sesion']);
 
-    } catch (err: any) {
-      console.error('registrarse error', err);
+    } catch (err) {
       this.mostrarAlerta('Error al crear el usuario');
     } finally {
       this.cargando = false;

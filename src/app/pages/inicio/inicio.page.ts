@@ -69,6 +69,10 @@ export class InicioPage implements OnInit {
   }
 
   async manejarClick(item: Componente) {
+    // Eliminar el foco del elemento activo
+    const activeElement = document.activeElement as HTMLElement | null;
+    activeElement?.blur();
+
     await this.menu.close();
     if (item.name === 'Cursos') this.router.navigateByUrl(`/tree-detail/${this.userCourseId}`);
     else if (item.name === 'Cerrar sesión') { sessionStorage.clear(); this.router.navigateByUrl('/inicio-sesion'); }

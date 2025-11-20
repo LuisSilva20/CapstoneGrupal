@@ -1,7 +1,7 @@
 <ion-header>
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-menu-button></ion-menu-button>
+      <ion-back-button defaultHref="/"></ion-back-button>
     </ion-buttons>
     <ion-title>{{ tree?.title || 'Árbol' }}</ion-title>
   </ion-toolbar>
@@ -13,15 +13,19 @@
 
   <ng-container *ngIf="!cargando">
 
+    <!-- Información del árbol -->
     <ion-card *ngIf="tree">
       <ion-card-header>
         <ion-card-title>{{ tree.title }}</ion-card-title>
       </ion-card-header>
       <ion-card-content>
         <p>{{ tree.description }}</p>
+        <ion-progress-bar [value]="progress"></ion-progress-bar>
+        <p>Progreso del árbol: {{ (progress * 100) | number:'1.0-0' }}%</p>
       </ion-card-content>
     </ion-card>
 
+    <!-- Cursos asociados -->
     <ion-grid *ngIf="cursos.length > 0">
       <ion-row *ngFor="let c of cursos">
         <ion-col size="12" size-md="6">
@@ -29,11 +33,13 @@
             <ion-card-header>
               <ion-card-title>{{ c.title }}</ion-card-title>
             </ion-card-header>
-
             <ion-card-content>
               <p>{{ c.description }}</p>
 
-              <ion-button expand="block" color="primary" (click)="openCourse(c.id!)">
+              <ion-progress-bar *ngIf="c.id" [value]="courseProgress[c.id] || 0"></ion-progress-bar>
+              <p *ngIf="c.id">Progreso del curso: {{ ((courseProgress[c.id] || 0) * 100) | number:'1.0-0' }}%</p>
+
+              <ion-button expand="block" color="primary" (click)="openCourse(c.id)">
                 Ver lecciones
               </ion-button>
             </ion-card-content>
@@ -43,7 +49,7 @@
 
       <ion-row>
         <ion-col size="12">
-          <ion-button expand="block" color="success" (click)="goToExam()">
+          <ion-button expand="block" color="secondary" (click)="goToExam()">
             Dar examen del árbol
           </ion-button>
         </ion-col>
@@ -51,6 +57,7 @@
     </ion-grid>
 
     <p *ngIf="cursos.length === 0">No hay cursos disponibles.</p>
+    <p *ngIf="errorMsg">{{ errorMsg }}</p>
 
   </ng-container>
 

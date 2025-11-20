@@ -1,29 +1,25 @@
-// src/app/pages/examen/examen.page.ts
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-import { IonicModule, MenuController } from '@ionic/angular';
+import { Router, ActivatedRoute, RouterModule } from '@angular/router';
+import { MenuController } from '@ionic/angular';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonList, IonItem, IonLabel, IonProgressBar,
   IonRadioGroup, IonRadio, IonButtons, IonMenuButton, IonSpinner
 } from '@ionic/angular/standalone';
 
+import { LearningService } from 'src/app/servicios/learning.service';
 import { PreguntaExamen } from 'src/app/interfaces/interfaces';
-import { Api } from 'src/app/servicios/api';
-import { firstValueFrom } from 'rxjs';
+import { Auth } from '@angular/fire/auth';
+import { getRedirectResult, User as FirebaseUser } from 'firebase/auth';
 
-/**
- * Interfaz local que usa los nombres que espera tu UI/template.
- * No cambia nada en las interfaces globales.
- */
 interface PreguntaLocal {
   id: string;
   texto: string;
   opciones: string[];
   correcta: number;
   explicacion?: string;
-  treeId?: string | number;
+  treeId?: string;
 }
 
 @Component({
@@ -32,16 +28,16 @@ interface PreguntaLocal {
   templateUrl: './examen.page.html',
   styleUrls: ['./examen.page.scss'],
   imports: [
-    CommonModule,
-    IonicModule,
+    CommonModule, RouterModule,
     IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader,
     IonCardTitle, IonCardContent, IonList, IonItem, IonLabel, IonProgressBar,
     IonButton, IonRadioGroup, IonRadio, IonButtons, IonMenuButton, IonSpinner
   ]
 })
 export class ExamenPage implements OnInit {
+  treeId?: string;
   preguntas: PreguntaLocal[] = [];
-  respuestasUsuario: Record<string | number, number> = {};
+  respuestasUsuario: Record<string, number> = {};
   preguntaActual = 0;
   corregida = false;
   terminado = false;
@@ -53,67 +49,61 @@ export class ExamenPage implements OnInit {
   progresoTiempo = 1;
   mensajeRetroalimentacion = '';
 
-  constructor(private router: Router, private menuCtrl: MenuController, private api: Api) {}
+  constructor(
+    private router: Router,
+    private route: ActivatedRoute,
+    private menuCtrl: MenuController,
+    private learning: LearningService,
+    private auth: Auth
+  ) {}
 
-  ngOnInit() {
-    this.cargarPreguntas();
+  async ngOnInit() {
+    this.treeId = this.route.snapshot.paramMap.get('id') ?? undefined;
+
+    // Comprobar si el usuario ya está logueado o viene de redirect
+    const currentUser = this.auth.currentUser;
+    if (currentUser) {
+      await this.cargarPreguntas(this.treeId);
+    } else {
+      try {
+        const result = await getRedirectResult(this.auth);
+        if (result && result.user) {
+          await this.cargarPreguntas(this.treeId);
+        } else {
+          console.warn('Usuario no autenticado, redirigiendo a login');
+          this.router.navigateByUrl('/login');
+        }
+      } catch (error) {
+        console.error('Error en login redirect:', error);
+        this.router.navigateByUrl('/login');
+      }
+    }
   }
 
   toggleMenu() {
     this.menuCtrl.toggle();
   }
 
-  async cargarPreguntas() {
+  async cargarPreguntas(treeId?: string) {
     this.cargando = true;
-
     try {
-      // Trae todas las preguntas desde Firestore (PreguntaExamen[])
-      const preguntasDB: PreguntaExamen[] = (await firstValueFrom(this.api.getPreguntas())) ?? [];
-
-      // Filtra árboles únicos
-      const arboles = Array.from(new Set(preguntasDB.map(p => p.treeId))).filter(a => a);
-
-      const preguntasPorArbol: PreguntaLocal[] = [];
-
-      // 3 preguntas por árbol (aleatorias)
-      arboles.forEach(arbol => {
-        const preguntasDelArbol = preguntasDB.filter(p => p.treeId === arbol);
-        preguntasDelArbol.sort(() => Math.random() - 0.5);
-        preguntasDelArbol.slice(0, 3).forEach(p => {
-          preguntasPorArbol.push({
-            id: (preguntasPorArbol.length + 1).toString(),
-            texto: p.question,
-            opciones: p.options,
-            correcta: Number(p.correctAnswer),
-            explicacion: p.explicacion ?? '',
-            treeId: p.treeId
-          });
-        });
-      });
-
-      // Completar hasta 35 preguntas
-      const restantes = 35 - preguntasPorArbol.length;
-      if (restantes > 0) {
-        const usadas = preguntasPorArbol.map(p => p.texto);
-        const disponibles = preguntasDB.filter(p => !usadas.includes(p.question));
-        disponibles.sort(() => Math.random() - 0.5);
-        disponibles.slice(0, restantes).forEach(p => {
-          preguntasPorArbol.push({
-            id: (preguntasPorArbol.length + 1).toString(),
-            texto: p.question,
-            opciones: p.options,
-            correcta: Number(p.correctAnswer),
-            explicacion: p.explicacion ?? '',
-            treeId: p.treeId
-          });
-        });
+      let preguntasDB: PreguntaExamen[] = [];
+      if (treeId) {
+        preguntasDB = await this.learning.getQuestionsByTreeAsync(treeId);
+      } else {
+        preguntasDB = await this.learning.getRandomExamQuestions(35);
       }
 
-      // Mezcla final
-      this.preguntas = preguntasPorArbol.sort(() => Math.random() - 0.5);
-
-    } catch (error) {
-      console.error('Error cargando preguntas:', error);
+      this.preguntas = preguntasDB.map(p => ({
+        id: p.id.toString(),
+        texto: p.question,
+        opciones: p.options,
+        correcta: Number(p.correctAnswer),
+        explicacion: p.explicacion ?? '',
+        treeId: p.treeId?.toString() ?? ''
+      }));
+    } catch (err) {
+      console.error('Error cargando preguntas:', err);
       this.preguntas = [];
     } finally {
       this.cargando = false;
@@ -141,7 +131,7 @@ export class ExamenPage implements OnInit {
   getTiempo(): string {
     const min = Math.floor(this.tiempoRestante / 60);
     const sec = this.tiempoRestante % 60;
-    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    return `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
   }
 
   responder(opcion: number) {
@@ -170,23 +160,6 @@ export class ExamenPage implements OnInit {
     this.mostrarFelicitacion = this.puntaje >= 75;
     this.terminado = true;
     this.mensajeRetroalimentacion = this.getMensajePorcentaje(this.puntaje);
-
-    // Guardar intento en Firestore
-    const usuarioId = sessionStorage.getItem('userId') || 'anon';
-    const respuestas = this.preguntas.map(p => ({
-      id: p.id,
-      treeId: p.treeId,
-      texto: p.texto,
-      opciones: [...p.opciones],
-      correcta: p.correcta,
-      seleccion: this.respuestasUsuario[p.id] ?? -1,
-      explicacion: p.explicacion
-    }));
-
-    this.api.guardarIntento(usuarioId, respuestas, this.puntaje).subscribe({
-      next: () => console.log('Intento guardado'),
-      error: (err) => console.error('Error guardando intento:', err)
-    });
   }
 
   reiniciar() {
@@ -200,7 +173,7 @@ export class ExamenPage implements OnInit {
     this.tiempoRestante = 900;
     this.progresoTiempo = 1;
     this.mensajeRetroalimentacion = '';
-    this.cargarPreguntas();
+    this.cargarPreguntas(this.treeId);
   }
 
   irPerfil() {

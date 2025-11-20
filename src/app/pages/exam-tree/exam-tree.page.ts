@@ -6,7 +6,8 @@ import { MenuController, IonHeader, IonToolbar, IonTitle, IonContent, IonCard,
   IonButton, IonRadioGroup, IonRadio, IonButtons, IonMenuButton, IonSpinner } from '@ionic/angular/standalone';
 import { Api } from 'src/app/servicios/api';
 import { PreguntaExamen } from 'src/app/interfaces/interfaces';
-import { Observable } from 'rxjs';
+import { Auth } from '@angular/fire/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 
 @Component({
   selector: 'app-exam-tree',
@@ -31,7 +32,6 @@ export class ExamTreePage implements OnInit {
   tiempoRestante = 600; // 10 minutos
   progresoTiempo = 1;
 
-  // Propiedades para HTML
   treeName = '';
   mostrarReglas = true;
   cargando = false;
@@ -40,12 +40,21 @@ export class ExamTreePage implements OnInit {
 
   treeId: string | null = null;
 
-  constructor(private router: Router, private menuCtrl: MenuController, private api: Api) {}
+  constructor(private router: Router, private menuCtrl: MenuController, private api: Api, private auth: Auth) {}
 
   ngOnInit() {
     this.treeId = sessionStorage.getItem('treeId');
     this.treeName = sessionStorage.getItem('treeName') || 'Árbol';
-    this.cargarPreguntas();
+
+    // Solo cargar preguntas si hay usuario autenticado
+    onAuthStateChanged(this.auth, user => {
+      if (user) {
+        this.cargarPreguntas();
+      } else {
+        console.warn('Usuario no autenticado. Redirigiendo a login.');
+        this.router.navigateByUrl('/login');
+      }
+    });
   }
 
   toggleMenu() {
@@ -56,16 +65,22 @@ export class ExamTreePage implements OnInit {
     if (!this.treeId) return;
     this.cargando = true;
 
-    this.api.getPreguntas(this.treeId).subscribe(preguntasDB => {
-      this.cargando = false;
-      // Mezclar y limitar a 20 preguntas
-      this.preguntas = preguntasDB
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 20)
-        .map((p, index) => ({
-          ...p,
-          id: p.id || index + 1
-        }));
+    this.api.getPreguntas(this.treeId).subscribe({
+      next: preguntasDB => {
+        this.cargando = false;
+        this.preguntas = preguntasDB
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 20)
+          .map((p, index) => ({
+            ...p,
+            id: p.id || index + 1
+          }));
+      },
+      error: err => {
+        this.cargando = false;
+        console.error('Error cargando preguntas:', err);
+        alert('No se pudieron cargar las preguntas. ¿Estás logueado?');
+      }
     });
   }
 

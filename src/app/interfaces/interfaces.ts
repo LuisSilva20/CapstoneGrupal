@@ -15,6 +15,7 @@ export interface User {
   learningProgress?: { [treeId: string]: number[] };
   progreso?: number;
   cursosCompletados?: string[];
+  savedCourses?: CursoGuardado[];
 }
 
 // =====================================
@@ -83,6 +84,11 @@ export interface IntentoExamen {
   }>;
 }
 
+export interface Material {
+  tipo: 'texto' | 'imagen' | 'video';
+  valor: string;
+}
+
 // =====================================
 // Lecciones
 // =====================================
@@ -92,6 +98,7 @@ export interface Leccion {
   content: string;
   duration: string;
   completed: boolean;
+  material?: Material[];
 }
 
 // =====================================
@@ -160,4 +167,13 @@ export interface Fuente {
   descripcion: string;
   link: string;
   botonTexto: string;
+}
+
+// =====================================
+// Respuesta de autenticación
+// =====================================
+export interface AuthResponse {
+  success: boolean;
+  user?: User;
+  error?: string;
 }

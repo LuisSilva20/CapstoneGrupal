@@ -1,16 +1,15 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   IonContent, IonHeader, IonToolbar, IonTitle, IonCard,
   IonCardHeader, IonCardTitle, IonCardContent, IonGrid, IonRow, IonCol,
-  IonMenuButton, IonButtons, IonProgressBar, IonButton, IonSpinner
+  IonButtons, IonProgressBar, IonButton, IonSpinner, IonBackButton
 } from '@ionic/angular/standalone';
-
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
-import { MenuController } from '@ionic/angular';
 
 import { KnowledgeTree, Curso } from '../../interfaces/interfaces';
 import { LearningService } from '../../servicios/learning.service';
+import { Auth } from '@angular/fire/auth';
 
 @Component({
   selector: 'app-tree-detail',
@@ -18,48 +17,80 @@ import { LearningService } from '../../servicios/learning.service';
   templateUrl: './tree-detail.page.html',
   styleUrls: ['./tree-detail.page.scss'],
   imports: [
-    CommonModule, RouterModule,
+    CommonModule, RouterModule, IonBackButton,
     IonContent, IonHeader, IonToolbar, IonTitle,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonGrid, IonRow, IonCol, IonButtons, IonMenuButton,
+    IonGrid, IonRow, IonCol, IonButtons,
     IonProgressBar, IonButton, IonSpinner
   ]
 })
-export class TreeDetailPage implements OnInit {
+export class TreeDetailPage {
 
-  treeId = '';
+  treeId: string = '';
   tree?: KnowledgeTree;
   cursos: Curso[] = [];
-  cargando = true;
-  errorMsg = '';
+  cargando: boolean = true;
+  errorMsg: string = '';
+
+  courseProgress: { [id: string]: number } = {};
+  progress: number = 0;
 
   constructor(
     private router: Router,
     private route: ActivatedRoute,
-    private menuCtrl: MenuController,
-    private learning: LearningService
+    private learning: LearningService,
+    private auth: Auth
   ) {}
 
-  async ngOnInit() {
+  async ionViewWillEnter() {
+    this.cargando = true;
+    this.errorMsg = '';
     try {
-      // Obtener ID del árbol
-      this.treeId = this.route.snapshot.paramMap.get('id') || '';
-      if (!this.treeId) {
+      const paramId = this.route.snapshot.paramMap.get('id');
+      if (!paramId) {
         this.errorMsg = 'No se recibió el ID del árbol.';
-        this.cargando = false;
         return;
       }
+      this.treeId = paramId;
 
-      // 1️⃣ Cargar árbol usando async/await
+      // Obtener árbol y cursos
       this.tree = await this.learning.getKnowledgeTreeAsync(this.treeId);
       if (!this.tree) {
         this.errorMsg = 'Árbol no encontrado.';
-        this.cargando = false;
         return;
       }
 
-      // 2️⃣ Cargar cursos del árbol
       this.cursos = await this.learning.getCoursesByTree(this.treeId);
+
+      // 🔹 Obtener progreso del usuario actual desde Firestore
+      const uid = this.auth.currentUser?.uid;
+      let completedCourses: string[] = [];
+      if (uid) {
+        const user = await this.learning.getUserByUid(uid);
+        if (user?.learningProgress?.[this.treeId]) {
+          completedCourses = Array.from(new Set(
+            user.learningProgress[this.treeId]
+              .map(id => id?.toString())
+              .filter(id => !!id)
+          ));
+        }
+      }
+
+      // Inicializar courseProgress solo para cursos existentes
+      this.courseProgress = {};
+      this.cursos.forEach((c: Curso) => {
+        const cid = c.id?.toString() || '';
+        this.courseProgress[cid] = completedCourses.includes(cid) ? 1 : 0;
+      });
+
+      this.updateTreeProgress();
+
+      // 🔹 Sincronizar localStorage
+      const completadosLS: Record<string, number> = {};
+      Object.keys(this.courseProgress).forEach(cid => {
+        if (this.courseProgress[cid] === 1) completadosLS[cid] = 1;
+      });
+      localStorage.setItem('completedCourses', JSON.stringify(completadosLS));
 
     } catch (err) {
       console.error(err);
@@ -69,7 +100,8 @@ export class TreeDetailPage implements OnInit {
     }
   }
 
-  openCourse(courseId: string | number) {
+  openCourse(courseId?: string) {
+    if (!courseId) return;
     this.router.navigate(['/course-detail', this.treeId, courseId]);
   }
 
@@ -77,4 +109,13 @@ export class TreeDetailPage implements OnInit {
     this.router.navigate(['/exam-tree', this.treeId]);
   }
 
+  private updateTreeProgress() {
+    if (!this.cursos || this.cursos.length === 0) {
+      this.progress = 0;
+      return;
+    }
+    const total = this.cursos.length;
+    const completed = Object.values(this.courseProgress).reduce((acc, val) => acc + val, 0);
+    this.progress = completed / total;
+  }
 }

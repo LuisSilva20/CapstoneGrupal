@@ -8,11 +8,12 @@
 </ion-header>
 
 <ion-content [fullscreen]="true" class="background">
+
   <div class="center-container">
 
     <!-- Logo -->
     <ion-card class="imgholder">
-      <img src="../../../assets/logo.jpg" alt="Logo">
+      <img src="../../../assets/logo.jpg" alt="Logo" />
     </ion-card>
 
     <!-- Formulario -->
@@ -23,30 +24,37 @@
 
       <ion-card-content>
         <form [formGroup]="inicioSesionForm">
+
           <ion-list lines="none">
 
+            <!-- Usuario o correo -->
             <ion-item>
               <ion-label position="floating">Usuario o correo</ion-label>
               <ion-input formControlName="identifier"></ion-input>
             </ion-item>
 
+            <!-- Contraseña -->
             <ion-item>
               <ion-label position="floating">Contraseña</ion-label>
               <ion-input type="password" formControlName="password"></ion-input>
             </ion-item>
 
+            <!-- Botón iniciar sesión -->
             <ion-button expand="block" color="warning" shape="round" (click)="iniciarSesion()">
               Iniciar Sesión
             </ion-button>
 
+            <!-- Google -->
             <ion-button expand="block" color="primary" (click)="loginGoogle()">
               Iniciar sesión con Google
             </ion-button>
 
           </ion-list>
+
         </form>
       </ion-card-content>
     </ion-card>
 
   </div>
+
 </ion-content>

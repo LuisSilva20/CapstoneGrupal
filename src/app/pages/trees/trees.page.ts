@@ -8,6 +8,7 @@ import {
 import { RouterModule, Router } from '@angular/router';
 import { LearningService } from '../../servicios/learning.service';
 import { KnowledgeTree } from '../../interfaces/interfaces';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-trees',
@@ -41,13 +42,12 @@ export class TreesPage implements OnInit {
     this.cargando = true;
     this.errorMsg = '';
     try {
-      const data = await this.learning.getKnowledgeTreesAsync();
-      this.trees = data;
+      // Convertimos el Observable a Promise
+      this.trees = await firstValueFrom(this.learning.getKnowledgeTrees());
 
       if (this.trees.length === 0) {
         this.errorMsg = 'No se encontraron árboles de conocimiento.';
       }
-
     } catch (err) {
       console.error('Error cargando árboles:', err);
       this.errorMsg = 'Error al cargar los árboles.';
@@ -56,8 +56,8 @@ export class TreesPage implements OnInit {
     }
   }
 
-  abrirArbol(treeId: string) {
-    this.router.navigate(['/tree-detail', treeId]);
-  }
+    abrirArbol(treeId: string | number) {
+      this.router.navigate(['/tree-detail', treeId.toString()]);
+    }
 
 }

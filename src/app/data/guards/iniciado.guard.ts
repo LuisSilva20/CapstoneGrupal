@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
-import { Auth, onAuthStateChanged } from '@angular/fire/auth';
+import { Auth } from '@angular/fire/auth';
 import { ToastController } from '@ionic/angular';
 
 @Injectable({
@@ -14,23 +14,38 @@ export class IniciadoGuard implements CanActivate {
     private toastController: ToastController
   ) {}
 
-  canActivate(): Promise<boolean> {
-    return new Promise((resolve) => {
-      onAuthStateChanged(this.auth, async (user) => {
-        if (user) {
-          // Usuario logeado → permite acceso
-          resolve(true);
-        } else {
-          // No logeado → mostrar toast y redirigir
-          const toast = await this.toastController.create({
-            message: 'Debe iniciar sesión',
-            duration: 2500
-          });
-          toast.present();
-          this.router.navigate(['/inicio-sesion']);
-          resolve(false);
-        }
+  async canActivate(): Promise<boolean> {
+    try {
+      const current = this.auth.currentUser;
+      if (current) {
+        return true;
+      } else {
+        // Eliminar el foco antes de redirigir
+        const activeElement = document.activeElement as HTMLElement | null;
+        activeElement?.blur();
+
+        const toast = await this.toastController.create({
+          message: 'Debe iniciar sesión',
+          duration: 2500,
+          position: 'bottom'
+        });
+        await toast.present();
+        this.router.navigate(['/inicio-sesion']);
+        return false;
+      }
+    } catch (err) {
+      // Eliminar el foco antes de redirigir en caso de error
+      const activeElement = document.activeElement as HTMLElement | null;
+      activeElement?.blur();
+
+      const toast = await this.toastController.create({
+        message: 'Error validando sesión',
+        duration: 2000,
+        position: 'bottom'
       });
-    });
+      await toast.present();
+      this.router.navigate(['/inicio-sesion']);
+      return false;
+    }
   }
 }

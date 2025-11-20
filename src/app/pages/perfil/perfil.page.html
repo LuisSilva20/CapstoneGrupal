@@ -1,3 +1,4 @@
+<!-- src/app/pages/perfil/perfil.page.html -->
 <ion-header [translucent]="true">
   <ion-toolbar color="primary">
     <ion-buttons slot="start">
@@ -9,7 +10,6 @@
 
 <ion-content [fullscreen]="true" class="perfil-background">
 
-  <!-- Card de información del usuario -->
   <ion-card *ngIf="usuario" class="perfil-card">
     <ion-card-header class="perfil-header">
       <ion-avatar class="perfil-avatar">
@@ -21,7 +21,6 @@
 
     <ion-card-content>
       <p><strong>Usuario:</strong> {{ usuario.username }}</p>
-      <p><strong>Estado:</strong> {{ usuario.isactive ? 'Activo' : 'Inactivo' }}</p>
 
       <div *ngIf="usuario.progreso !== undefined">
         <p><strong>Progreso general:</strong> {{ usuario.progreso }}%</p>
@@ -30,24 +29,41 @@
     </ion-card-content>
   </ion-card>
 
-  <!-- Cursos realizados -->
   <ion-card *ngIf="cursos.length > 0">
     <ion-card-header>
       <ion-card-title>Cursos Realizados</ion-card-title>
     </ion-card-header>
     <ion-card-content>
       <div *ngFor="let curso of cursos" class="curso-card">
-        <div class="curso-titulo">{{ curso.title }}</div>
-        <div class="curso-arbol"><strong>Árbol:</strong> {{ curso.arbol ?? 'Sin categoría' }}</div>
-        <div class="curso-progreso">
-          <strong>Progreso:</strong> {{ curso.progreso }}%
+        <ion-item>
+          <ion-label>
+            <h2>{{ curso.title }}</h2>
+            <p><strong>Árbol:</strong> {{ curso.arbol ?? 'Sin categoría' }}</p>
+            <p><strong>Progreso:</strong> {{ curso.progreso }}%</p>
+          </ion-label>
           <ion-progress-bar [value]="curso.progreso / 100" color="tertiary"></ion-progress-bar>
-        </div>
+        </ion-item>
       </div>
     </ion-card-content>
   </ion-card>
 
-  <!-- Árboles de conocimiento -->
+  <ion-card *ngIf="arboles.length > 0">
+    <ion-card-header>
+      <ion-card-title>Progreso por Árbol</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div *ngFor="let arbol of arboles" class="arbol-card">
+        <ion-item (click)="irArbol(arbol.nombre)">
+          <ion-label>
+            <h2>{{ arbol.nombre }}</h2>
+            <p><strong>Porcentaje de Aciertos:</strong> {{ arbol.porcentajeAciertos }}%</p>
+          </ion-label>
+          <ion-progress-bar [value]="arbol.porcentajeAciertos / 100" [color]="arbol.porcentajeAciertos >= 75 ? 'success' : 'danger'"></ion-progress-bar>
+        </ion-item>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
   <ion-card>
     <ion-card-header>
       <ion-card-title>Árboles de Conocimiento</ion-card-title>
@@ -81,7 +97,6 @@
     </ion-card-content>
   </ion-card>
 
-  <!-- Exámenes realizados -->
   <ion-card *ngIf="intentos.length > 0">
     <ion-card-header>
       <ion-card-title>Exámenes Realizados</ion-card-title>
@@ -114,10 +129,10 @@
             <ion-list>
               <ion-item *ngFor="let r of intento.respuestas">
                 <ion-label>
-                  <p><strong>{{ r.texto }}</strong></p>
+                  <p><strong>{{ r.texto ?? '' }}</strong></p>
                   <p>
-                    <span class="incorrecta">Tu respuesta: {{ r.opciones[r.seleccion] ?? 'No respondida' }}</span><br>
-                    <span class="correcta">Respuesta correcta: {{ r.opciones[r.correcta] ?? 'N/A' }}</span>
+                    <span class="incorrecta">Tu respuesta: {{ r.opciones?.[r.seleccion ?? -1] ?? 'No respondida' }}</span><br>
+                    <span class="correcta">Respuesta correcta: {{ r.opciones?.[r.correcta ?? -1] ?? 'N/A' }}</span>
                   </p>
                   <p *ngIf="r.explicacion"><em>{{ r.explicacion }}</em></p>
                 </ion-label>
@@ -126,6 +141,12 @@
           </div>
         </ion-card-content>
       </ion-card>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card *ngIf="cargando">
+    <ion-card-content>
+      <p>Cargando perfil...</p>
     </ion-card-content>
   </ion-card>
 
