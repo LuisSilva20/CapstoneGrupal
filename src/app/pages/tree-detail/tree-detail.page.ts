@@ -1,3 +1,4 @@
+// src/app/pages/tree-detail/tree-detail.page.ts
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -26,7 +27,7 @@ import { Auth } from '@angular/fire/auth';
 })
 export class TreeDetailPage {
 
-  treeId: string = '';
+  treeId: number = 0;
   tree?: KnowledgeTree;
   cursos: Curso[] = [];
   cargando: boolean = true;
@@ -51,7 +52,7 @@ export class TreeDetailPage {
         this.errorMsg = 'No se recibió el ID del árbol.';
         return;
       }
-      this.treeId = paramId;
+      this.treeId = Number(paramId);
 
       // Obtener árbol y cursos
       this.tree = await this.learning.getKnowledgeTreeAsync(this.treeId);
@@ -67,11 +68,11 @@ export class TreeDetailPage {
       let completedCourses: string[] = [];
       if (uid) {
         const user = await this.learning.getUserByUid(uid);
-        if (user?.learningProgress?.[this.treeId]) {
+        if (user?.learningProgress?.[this.treeId.toString()]) {
           completedCourses = Array.from(new Set(
-            user.learningProgress[this.treeId]
+            user.learningProgress[this.treeId.toString()]
               .map(id => id?.toString())
-              .filter(id => !!id)
+              .filter(Boolean)
           ));
         }
       }

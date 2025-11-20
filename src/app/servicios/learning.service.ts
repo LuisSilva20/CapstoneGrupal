@@ -1,18 +1,18 @@
-// src/app/servicios/learning.service.ts
 import { Injectable } from '@angular/core';
 import {
   Firestore,
   collection,
-  collectionData,
   doc,
-  docData,
   getDocs,
   getDoc,
   updateDoc,
   query,
-  where
+  where,
+  CollectionReference,
+  addDoc,
+  DocumentReference
 } from '@angular/fire/firestore';
-
+import { collectionData, docData } from '@angular/fire/firestore';
 import { Observable, firstValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -28,29 +28,27 @@ import {
 
 import { getCoursesByTree as localGetCoursesByTree } from 'src/app/data/treesData';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class LearningService {
   constructor(private firestore: Firestore) {}
 
-  // ======================================================
+  // ================================
   // 1) ÁRBOLES DE CONOCIMIENTO
-  // ======================================================
+  // ================================
   getKnowledgeTrees(): Observable<KnowledgeTree[]> {
-    const ref = collection(this.firestore, 'cursos');
+    const ref = collection(this.firestore, 'cursos') as CollectionReference;
     return collectionData(ref, { idField: 'id' }).pipe(
       map((trees: any[]) =>
         (trees || []).map(t => ({
-          id: t.id?.toString() ?? '',
+          id: Number(t.id ?? 0),
           title: t.title ?? t.titulo ?? 'Árbol sin título',
           description: t.description ?? t.descripcion ?? 'Sin descripción',
           icon: t.icon ?? '🌳',
-          phase: typeof t.phase === 'number' ? t.phase : parseInt(t.phase) || 0,
+          phase: Number(t.phase ?? 0),
           progress: t.progress ?? 0,
           lessons: Array.isArray(t.lessons)
             ? t.lessons.map((l: any, idx: number) => ({
-                id: l.id?.toString() ?? (idx + 1).toString(),
+                id: Number(l.id ?? idx + 1),
                 title: l.title ?? l.titulo ?? `Lección ${idx + 1}`,
                 content: l.content ?? l.htmlContent ?? '',
                 duration: l.duration ?? l.duracion ?? '0',
@@ -62,21 +60,21 @@ export class LearningService {
     );
   }
 
-  getKnowledgeTree(id: string): Observable<KnowledgeTree | undefined> {
-    const ref = doc(this.firestore, `cursos/${id}`);
+  getKnowledgeTree(id: number): Observable<KnowledgeTree | undefined> {
+    const ref = doc(this.firestore, `cursos/${id}`) as DocumentReference;
     return docData(ref, { idField: 'id' }).pipe(
       map((t: any) =>
         t
           ? ({
-              id: t.id?.toString() ?? '',
+              id: Number(t.id ?? 0),
               title: t.title ?? t.titulo ?? 'Árbol sin título',
               description: t.description ?? t.descripcion ?? 'Sin descripción',
               icon: t.icon ?? '🌳',
-              phase: typeof t.phase === 'number' ? t.phase : parseInt(t.phase) || 0,
+              phase: Number(t.phase ?? 0),
               progress: t.progress ?? 0,
               lessons: Array.isArray(t.lessons)
                 ? t.lessons.map((l: any, idx: number) => ({
-                    id: l.id?.toString() ?? (idx + 1).toString(),
+                    id: Number(l.id ?? idx + 1),
                     title: l.title ?? l.titulo ?? `Lección ${idx + 1}`,
                     content: l.content ?? l.htmlContent ?? '',
                     duration: l.duration ?? l.duracion ?? '0',
@@ -93,23 +91,23 @@ export class LearningService {
     return firstValueFrom(this.getKnowledgeTrees());
   }
 
-  async getKnowledgeTreeAsync(id: string): Promise<KnowledgeTree | undefined> {
+  async getKnowledgeTreeAsync(id: number): Promise<KnowledgeTree | undefined> {
     return firstValueFrom(this.getKnowledgeTree(id));
   }
 
-  // ======================================================
+  // ================================
   // 2) CURSOS POR ÁRBOL (local fallback)
-  // ======================================================
-  async getCoursesByTree(treeId: string): Promise<Curso[]> {
-    return Promise.resolve(localGetCoursesByTree(treeId));
+  // ================================
+  async getCoursesByTree(treeId: number): Promise<Curso[]> {
+    return Promise.resolve(localGetCoursesByTree(treeId.toString()));
   }
 
-  // ======================================================
+  // ================================
   // 3) LECCIONES DE UN CURSO
-  // ======================================================
+  // ================================
   async getLessons(courseId: string): Promise<Leccion[]> {
     try {
-      const ref = collection(this.firestore, 'lessonContent');
+      const ref = collection(this.firestore, 'lessonContent') as CollectionReference;
       const snapshot = await getDocs(ref);
       return snapshot.docs
         .filter(d => d.id.startsWith(courseId))
@@ -129,53 +127,45 @@ export class LearningService {
     }
   }
 
-  // ======================================================
+  // ================================
   // 4) PREGUNTAS DEL EXAMEN POR ÁRBOL
-  // ======================================================
-  getQuestionsByTree(treeId: string): Observable<PreguntaExamen[]> {
-    if (!treeId) return new Observable<PreguntaExamen[]>(observer => { observer.next([]); observer.complete(); });
-    const ref = collection(this.firestore, 'preguntas');
-    const q = query(ref, where('treeId', '==', treeId));
-    return collectionData(q, { idField: 'id' }).pipe(
-      map((pregs: any[]) =>
-        (pregs || []).map(p => ({
-          id: p.id,
-          treeId: p.treeId?.toString() ?? '',
-          question: p.question ?? p.questionText ?? '',
-          options: p.options ?? p.opciones ?? [],
-          correctAnswer: Number(p.correctAnswer ?? p.correctAnswerIndex ?? 0),
-          explicacion: p.explanation ?? p.explicacion ?? ''
-        }) as PreguntaExamen)
-      )
-    );
-  }
-
-  async getQuestionsByTreeAsync(treeId: string): Promise<PreguntaExamen[]> {
-    return firstValueFrom(this.getQuestionsByTree(treeId));
-  }
-
-  // ======================================================
-  // 5) CONTENIDO HTML DE UNA LECCIÓN
-  // ======================================================
-  async getLessonContent(id: string): Promise<string> {
+  // ================================
+  async getQuestionsByTreeSafe(treeId: number, limit: number = 15): Promise<PreguntaExamen[]> {
     try {
-      const ref = doc(this.firestore, `lessonContent/${id}`);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return '';
-      return (snap.data() as any).htmlContent ?? '';
+      const ref = collection(this.firestore, 'preguntas') as CollectionReference;
+      const q = query(ref, where('treeId', '==', treeId));
+      const snap = await getDocs(q);
+      if (snap.empty) return [];
+      const preguntas: PreguntaExamen[] = snap.docs.map(d => {
+        const data = d.data() as any;
+        return {
+          id: d.id.toString(),
+          treeId: Number(data.treeId ?? treeId),
+          question: data.question ?? '',
+          options: Array.isArray(data.options) ? data.options : [],
+          correctAnswer: Number(data.correctAnswer ?? 0),
+          explicacion: data.explanation ?? data.explicacion ?? ''
+        } as PreguntaExamen;
+      });
+      // Aleatorizar y limitar
+      return preguntas.sort(() => Math.random() - 0.5).slice(0, limit);
     } catch (err) {
-      console.error('Error getLessonContent:', err);
-      return '';
+      console.error('Error cargando preguntas safe:', err);
+      return [];
     }
   }
 
-  // ======================================================
-  // 6) EXAMEN ALEATORIO
-  // ======================================================
+  async getQuestionsByTreeAsync(treeId: number, limit: number = 15): Promise<PreguntaExamen[]> {
+    return this.getQuestionsByTreeSafe(treeId, limit);
+  }
+
+  // ================================
+  // 5) EXAMEN ALEATORIO GENERAL
+  // ================================
   async getRandomExamQuestions(totalPreguntas: number = 35): Promise<PreguntaExamen[]> {
     try {
       const trees = await this.getKnowledgeTreesAsync();
-      const treeIds = trees.map(t => t.id.toString());
+      const treeIds = trees.map(t => Number(t.id));
       let selected: PreguntaExamen[] = [];
       for (const treeId of treeIds) {
         const preguntas = await this.getQuestionsByTreeAsync(treeId);
@@ -196,51 +186,39 @@ export class LearningService {
     }
   }
 
- async saveCourseProgress(userId: string, curso: CursoGuardado, treeId?: string): Promise<void> {
-  try {
-    const userRef = doc(this.firestore, `users/${userId}`);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) return;
-
-    const userData = userSnap.data() as User;
-    const learningProgress = { ...(userData.learningProgress || {}) };
-
-    // Determinar treeId
-    let tId = treeId || curso.arbol || 'tree-unknown';
-    if (!tId.startsWith('tree-')) tId = `tree-${tId}`;
-
-    // IDs existentes para este árbol (solo strings válidos)
-    const existing = Array.isArray(learningProgress[tId])
-      ? learningProgress[tId].map(String).filter(id => !!id)
-      : [];
-
-    // IDs nuevas lecciones/cursos completadas
-    const newCompleted = Array.isArray(curso.lessons)
-      ? curso.lessons.map((l: any) => l.id?.toString()).filter(id => !!id)
-      : [curso.id?.toString()].filter(id => !!id);
-
-    // Mantener solo IDs únicos y válidos
-    const merged = Array.from(new Set([...existing, ...newCompleted]));
-
-    learningProgress[tId] = merged;
-
-    await updateDoc(userRef, { learningProgress });
-
-    console.log(`✅ Progreso guardado para ${tId}:`, learningProgress[tId]);
-
-  } catch (err) {
-    console.error(`❌ Error guardando progreso usuario ${userId}:`, err);
+  // ================================
+  // 6) GUARDAR RESPUESTAS DEL EXAMEN EN EXAM HISTORY
+  // ================================
+  async saveExamAttemptInHistory(
+    uid: string,
+    treeId: number | string,
+    respuestas: { idPregunta: string | number; seleccion: number; correcta: number }[]
+  ): Promise<void> {
+    try {
+      const ref = collection(this.firestore, `users/${uid}/examHistory`);
+      const intento = {
+        treeId: treeId.toString(),
+        preguntas: respuestas.map(r => ({
+          idPregunta: r.idPregunta.toString(),
+          seleccion: r.seleccion,
+          correcta: r.correcta
+        })),
+        fecha: new Date().toISOString(),
+        puntaje: respuestas.filter(r => r.seleccion === r.correcta).length
+      };
+      await addDoc(ref, intento);
+      console.log('✅ Intento guardado en examHistory');
+    } catch (err) {
+      console.error('❌ Error guardando intento en examHistory:', err);
+    }
   }
-}
 
-
-
-  // ======================================================
-  // 8) HELPERS PARA PERFIL
-  // ======================================================
+  // ================================
+  // 7) HELPERS PARA PERFIL
+  // ================================
   async getUserByUid(uid: string): Promise<User | null> {
     try {
-      const ref = doc(this.firestore, `users/${uid}`);
+      const ref = doc(this.firestore, `users/${uid}`) as DocumentReference;
       const snap = await getDoc(ref);
       if (!snap.exists()) return null;
       return { ...(snap.data() as User), id: uid } as User;
@@ -252,9 +230,8 @@ export class LearningService {
 
   async getUserIntentosByUid(uid: string): Promise<IntentoExamen[]> {
     try {
-      const ref = collection(this.firestore, 'resultados');
-      const q = query(ref, where('usuarioId', '==', uid));
-      const snap = await getDocs(q);
+      const ref = collection(this.firestore, `users/${uid}/examHistory`) as CollectionReference;
+      const snap = await getDocs(ref);
       return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) } as IntentoExamen));
     } catch (err) {
       console.error('Error getUserIntentosByUid:', err);
@@ -262,16 +239,34 @@ export class LearningService {
     }
   }
 
-  async getUserSavedCourses(uid: string): Promise<CursoGuardado[]> {
+  // ================================
+  // 8) GUARDAR PROGRESO DE CURSOS
+  // ================================
+  async saveCourseProgress(userId: string, curso: CursoGuardado, treeId?: number): Promise<void> {
     try {
-      const u = await this.getUserByUid(uid);
-      if (!u) return [];
-      const saved = (u as any).savedCourses;
-      if (!Array.isArray(saved)) return [];
-      return saved as CursoGuardado[];
+      const userRef = doc(this.firestore, `users/${userId}`) as DocumentReference;
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) return;
+
+      const userData = userSnap.data() as User;
+      const learningProgress = { ...(userData.learningProgress || {}) };
+      const tId = treeId?.toString() || curso.arbol?.toString() || 'tree-unknown';
+
+      const existing: string[] = Array.isArray(learningProgress[tId])
+        ? learningProgress[tId].map(id => id.toString()).filter(Boolean)
+        : [];
+
+      const newCompleted: string[] = Array.isArray(curso.lessons) && curso.lessons.length > 0
+        ? curso.lessons.map(l => l.titulo).filter(Boolean)
+        : [curso.title].filter(Boolean);
+
+      learningProgress[tId] = Array.from(new Set([...existing, ...newCompleted])) as any;
+      await updateDoc(userRef, { learningProgress });
+      console.log(`✅ Progreso guardado para ${tId}:`, learningProgress[tId]);
     } catch (err) {
-      console.error('Error getUserSavedCourses:', err);
-      return [];
+      console.error(`❌ Error guardando progreso para el usuario ${userId}:`, err);
     }
   }
+
+
 }

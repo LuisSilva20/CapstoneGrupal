@@ -2,12 +2,21 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MenuController, IonHeader, IonToolbar, IonTitle, IonContent, IonCard,
-  IonCardHeader, IonCardTitle, IonCardContent, IonList, IonItem, IonLabel, IonProgressBar,
-  IonButton, IonRadioGroup, IonRadio, IonButtons, IonMenuButton, IonSpinner } from '@ionic/angular/standalone';
-import { Api } from 'src/app/servicios/api';
+  IonCardHeader, IonCardTitle, IonCardContent, IonList, IonItem, IonLabel,
+  IonProgressBar, IonButton, IonRadioGroup, IonRadio, IonButtons, IonMenuButton, IonSpinner } from '@ionic/angular/standalone';
+import { LearningService } from 'src/app/servicios/learning.service';
 import { PreguntaExamen } from 'src/app/interfaces/interfaces';
 import { Auth } from '@angular/fire/auth';
 import { onAuthStateChanged } from 'firebase/auth';
+
+interface PreguntaLocal {
+  id: string;
+  texto: string;
+  opciones: string[];
+  correcta: number;
+  explicacion?: string;
+  treeId?: number;
+}
 
 @Component({
   selector: 'app-exam-tree',
@@ -22,34 +31,31 @@ import { onAuthStateChanged } from 'firebase/auth';
   ]
 })
 export class ExamTreePage implements OnInit {
-
-  preguntas: PreguntaExamen[] = [];
-  respuestasUsuario: Record<string | number, number> = {};
+  treeId?: number;
+  treeName = '';
+  preguntas: PreguntaLocal[] = [];
+  respuestasUsuario: Record<string, number> = {};
   preguntaActual = 0;
   corregida = false;
   terminado = false;
   puntaje = 0;
+  mostrarFelicitacion = false;
+  mostrarReglas = true;
+  cargando = true;
   tiempoRestante = 600; // 10 minutos
   progresoTiempo = 1;
-
-  treeName = '';
-  mostrarReglas = true;
-  cargando = false;
-  mostrarFelicitacion = false;
   mensajeRetroalimentacion = '';
 
-  treeId: string | null = null;
-
-  constructor(private router: Router, private menuCtrl: MenuController, private api: Api, private auth: Auth) {}
+  constructor(private router: Router, private menuCtrl: MenuController,
+              private learning: LearningService, private auth: Auth) {}
 
   ngOnInit() {
-    this.treeId = sessionStorage.getItem('treeId');
+    this.treeId = sessionStorage.getItem('treeId') ? Number(sessionStorage.getItem('treeId')) : undefined;
     this.treeName = sessionStorage.getItem('treeName') || 'Árbol';
 
-    // Solo cargar preguntas si hay usuario autenticado
-    onAuthStateChanged(this.auth, user => {
+    onAuthStateChanged(this.auth, async user => {
       if (user) {
-        this.cargarPreguntas();
+        await this.cargarPreguntas();
       } else {
         console.warn('Usuario no autenticado. Redirigiendo a login.');
         this.router.navigateByUrl('/login');
@@ -57,37 +63,36 @@ export class ExamTreePage implements OnInit {
     });
   }
 
-  toggleMenu() {
-    this.menuCtrl.toggle();
-  }
+  toggleMenu() { this.menuCtrl.toggle(); }
 
-  cargarPreguntas() {
-    if (!this.treeId) return;
+  async cargarPreguntas() {
     this.cargando = true;
-
-    this.api.getPreguntas(this.treeId).subscribe({
-      next: preguntasDB => {
-        this.cargando = false;
-        this.preguntas = preguntasDB
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 20)
-          .map((p, index) => ({
-            ...p,
-            id: p.id || index + 1
-          }));
-      },
-      error: err => {
-        this.cargando = false;
-        console.error('Error cargando preguntas:', err);
-        alert('No se pudieron cargar las preguntas. ¿Estás logueado?');
+    try {
+      let preguntasDB: PreguntaExamen[] = [];
+      if (this.treeId !== undefined) {
+        preguntasDB = await this.learning.getQuestionsByTreeSafe(this.treeId);
       }
-    });
+      this.preguntas = preguntasDB.map(p => ({
+        id: p.id.toString(),
+        texto: p.question,
+        opciones: p.options,
+        correcta: Number(p.correctAnswer),
+        explicacion: p.explicacion ?? '',
+        treeId: Number(p.treeId ?? 0)
+      }));
+      if (this.preguntas.length === 0) console.warn('No se encontraron preguntas para este examen.');
+    } catch (err) {
+      console.error('Error cargando preguntas:', err);
+      this.preguntas = [];
+    } finally {
+      this.cargando = false;
+    }
   }
 
   comenzarExamen() {
     this.mostrarReglas = false;
-    this.corregida = false;
     this.iniciarTemporizador();
+    this.corregida = false;
   }
 
   iniciarTemporizador() {
@@ -95,10 +100,7 @@ export class ExamTreePage implements OnInit {
       if (this.terminado) { clearInterval(intervalo); return; }
       this.tiempoRestante--;
       this.progresoTiempo = this.tiempoRestante / 600;
-      if (this.tiempoRestante <= 0) {
-        clearInterval(intervalo);
-        this.finalizarExamen();
-      }
+      if (this.tiempoRestante <= 0) { clearInterval(intervalo); this.finalizarExamen(); }
     }, 1000);
   }
 
@@ -120,20 +122,27 @@ export class ExamTreePage implements OnInit {
       this.preguntaActual++;
       const id = this.preguntas[this.preguntaActual].id;
       this.corregida = this.respuestasUsuario[id] !== undefined;
-    } else {
-      this.finalizarExamen();
-    }
+    } else this.finalizarExamen();
   }
 
-  finalizarExamen() {
-    const correctas = this.preguntas.filter(
-      p => this.respuestasUsuario[p.id] === p.correctAnswer
-    ).length;
+  async finalizarExamen() {
+    const respuestas = this.preguntas.map(p => ({
+      idPregunta: p.id,
+      seleccion: this.respuestasUsuario[p.id] ?? -1,
+      correcta: p.correcta
+    }));
 
+    const correctas = respuestas.filter(r => r.seleccion === r.correcta).length;
     this.puntaje = (correctas / this.preguntas.length) * 100;
     this.mostrarFelicitacion = this.puntaje >= 75;
     this.terminado = true;
     this.mensajeRetroalimentacion = this.getMensajePorcentaje(this.puntaje);
+
+    // 🔹 Guardar intento en Firestore
+    const uid = this.auth.currentUser?.uid;
+    if (uid && this.treeId !== undefined) {
+      await this.learning.saveExamAttemptInHistory(uid, this.treeId, respuestas);
+    }
   }
 
   reiniciar() {
@@ -142,17 +151,15 @@ export class ExamTreePage implements OnInit {
     this.corregida = false;
     this.terminado = false;
     this.puntaje = 0;
-    this.mostrarReglas = true;
     this.mostrarFelicitacion = false;
-    this.mensajeRetroalimentacion = '';
+    this.mostrarReglas = true;
     this.tiempoRestante = 600;
     this.progresoTiempo = 1;
+    this.mensajeRetroalimentacion = '';
     this.cargarPreguntas();
   }
 
-  volverArboles() {
-    this.router.navigateByUrl('/knowledge-trees');
-  }
+  volverArboles() { this.router.navigateByUrl('/knowledge-trees'); }
 
   getMensajePorcentaje(puntaje: number): string {
     if (puntaje <= 25) return 'Sigue intentándolo.';

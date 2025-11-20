@@ -1,3 +1,4 @@
+// src/app/pages/course-detail/course-detail.page.ts
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -16,16 +17,15 @@ import { Auth } from '@angular/fire/auth';
   templateUrl: './course-detail.page.html',
   styleUrls: ['./course-detail.page.scss'],
   imports: [
-    IonSpinner, IonButton,
     CommonModule,
     IonHeader, IonToolbar, IonTitle, IonContent,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonButtons, IonBackButton
+    IonButtons, IonBackButton, IonSpinner, IonButton
   ]
 })
 export class CourseDetailPage implements OnInit {
 
-  treeId!: string;
+  treeId!: number;
   courseId!: string;
 
   curso: Curso | null = null;
@@ -41,7 +41,7 @@ export class CourseDetailPage implements OnInit {
   ) {}
 
   async ngOnInit() {
-    this.treeId = this.route.snapshot.paramMap.get('treeId') ?? '';
+    this.treeId = Number(this.route.snapshot.paramMap.get('treeId') ?? 0);
     this.courseId = this.route.snapshot.paramMap.get('courseId') ?? '';
 
     if (!this.treeId || !this.courseId) {
@@ -63,9 +63,9 @@ export class CourseDetailPage implements OnInit {
       let completedCourses: string[] = [];
       if (uid) {
         const user = await this.learningService.getUserByUid(uid);
-        if (user?.learningProgress?.[this.treeId]) {
+        if (user?.learningProgress?.[this.treeId.toString()]) {
           completedCourses = Array.from(new Set(
-            user.learningProgress[this.treeId]
+            user.learningProgress[this.treeId.toString()]
               .map(id => id?.toString())
               .filter(id => !!id)
           ));

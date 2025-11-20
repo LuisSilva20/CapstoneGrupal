@@ -11,7 +11,7 @@ import {
 import { LearningService } from 'src/app/servicios/learning.service';
 import { PreguntaExamen } from 'src/app/interfaces/interfaces';
 import { Auth } from '@angular/fire/auth';
-import { getRedirectResult, User as FirebaseUser } from 'firebase/auth';
+import { getRedirectResult } from 'firebase/auth';
 
 interface PreguntaLocal {
   id: string;
@@ -19,7 +19,7 @@ interface PreguntaLocal {
   opciones: string[];
   correcta: number;
   explicacion?: string;
-  treeId?: string;
+  treeId?: number;
 }
 
 @Component({
@@ -35,7 +35,7 @@ interface PreguntaLocal {
   ]
 })
 export class ExamenPage implements OnInit {
-  treeId?: string;
+  treeId?: number;
   preguntas: PreguntaLocal[] = [];
   respuestasUsuario: Record<string, number> = {};
   preguntaActual = 0;
@@ -45,7 +45,7 @@ export class ExamenPage implements OnInit {
   mostrarFelicitacion = false;
   mostrarReglas = true;
   cargando = true;
-  tiempoRestante = 900; // 15 minutos
+  tiempoRestante = 900;
   progresoTiempo = 1;
   mensajeRetroalimentacion = '';
 
@@ -58,9 +58,9 @@ export class ExamenPage implements OnInit {
   ) {}
 
   async ngOnInit() {
-    this.treeId = this.route.snapshot.paramMap.get('id') ?? undefined;
+    const paramId = this.route.snapshot.paramMap.get('id');
+    this.treeId = paramId ? Number(paramId) : undefined;
 
-    // Comprobar si el usuario ya está logueado o viene de redirect
     const currentUser = this.auth.currentUser;
     if (currentUser) {
       await this.cargarPreguntas(this.treeId);
@@ -70,26 +70,23 @@ export class ExamenPage implements OnInit {
         if (result && result.user) {
           await this.cargarPreguntas(this.treeId);
         } else {
-          console.warn('Usuario no autenticado, redirigiendo a login');
           this.router.navigateByUrl('/login');
         }
       } catch (error) {
-        console.error('Error en login redirect:', error);
+        console.error('Error login redirect:', error);
         this.router.navigateByUrl('/login');
       }
     }
   }
 
-  toggleMenu() {
-    this.menuCtrl.toggle();
-  }
+  toggleMenu() { this.menuCtrl.toggle(); }
 
-  async cargarPreguntas(treeId?: string) {
+  async cargarPreguntas(treeId?: number) {
     this.cargando = true;
     try {
       let preguntasDB: PreguntaExamen[] = [];
-      if (treeId) {
-        preguntasDB = await this.learning.getQuestionsByTreeAsync(treeId);
+      if (treeId !== undefined) {
+        preguntasDB = await this.learning.getQuestionsByTreeSafe(treeId);
       } else {
         preguntasDB = await this.learning.getRandomExamQuestions(35);
       }
@@ -100,8 +97,10 @@ export class ExamenPage implements OnInit {
         opciones: p.options,
         correcta: Number(p.correctAnswer),
         explicacion: p.explicacion ?? '',
-        treeId: p.treeId?.toString() ?? ''
+        treeId: Number(p.treeId ?? 0)
       }));
+
+      if (this.preguntas.length === 0) console.warn('No se encontraron preguntas para este examen.');
     } catch (err) {
       console.error('Error cargando preguntas:', err);
       this.preguntas = [];
@@ -121,10 +120,7 @@ export class ExamenPage implements OnInit {
       if (this.terminado) { clearInterval(intervalo); return; }
       this.tiempoRestante--;
       this.progresoTiempo = this.tiempoRestante / 900;
-      if (this.tiempoRestante <= 0) {
-        clearInterval(intervalo);
-        this.finalizarExamen();
-      }
+      if (this.tiempoRestante <= 0) { clearInterval(intervalo); this.finalizarExamen(); }
     }, 1000);
   }
 
@@ -146,20 +142,27 @@ export class ExamenPage implements OnInit {
       this.preguntaActual++;
       const id = this.preguntas[this.preguntaActual].id;
       this.corregida = this.respuestasUsuario[id] !== undefined;
-    } else {
-      this.finalizarExamen();
-    }
+    } else this.finalizarExamen();
   }
 
-  finalizarExamen() {
-    const correctas = this.preguntas.filter(
-      p => this.respuestasUsuario[p.id] === p.correcta
-    ).length;
+  async finalizarExamen() {
+    const respuestas = this.preguntas.map(p => ({
+      idPregunta: p.id,
+      seleccion: this.respuestasUsuario[p.id] ?? -1,
+      correcta: p.correcta
+    }));
 
+    const correctas = respuestas.filter(r => r.seleccion === r.correcta).length;
     this.puntaje = (correctas / this.preguntas.length) * 100;
     this.mostrarFelicitacion = this.puntaje >= 75;
     this.terminado = true;
     this.mensajeRetroalimentacion = this.getMensajePorcentaje(this.puntaje);
+
+    // 🔹 Guardar intento en Firestore
+    const uid = this.auth.currentUser?.uid;
+    if (uid && this.treeId !== undefined) {
+      await this.learning.saveExamAttemptInHistory(uid, this.treeId, respuestas);
+    }
   }
 
   reiniciar() {
@@ -176,9 +179,7 @@ export class ExamenPage implements OnInit {
     this.cargarPreguntas(this.treeId);
   }
 
-  irPerfil() {
-    this.router.navigateByUrl('/estadisticas');
-  }
+  irPerfil() { this.router.navigateByUrl('/estadisticas'); }
 
   getMensajePorcentaje(puntaje: number): string {
     if (puntaje <= 25) return 'Sigue intentándolo.';

@@ -84,6 +84,7 @@ export interface IntentoExamen {
   }>;
 }
 
+
 export interface Material {
   tipo: 'texto' | 'imagen' | 'video';
   valor: string;
